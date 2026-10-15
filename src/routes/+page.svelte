@@ -16,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>Scenora — Find your next favorite</title>
+	<title>Cineva — Find your next favorite</title>
 	<meta
 		name="description"
 		content="Discover cinematic masterpieces, trending releases, and upcoming premieres through an editorial film browsing experience."
@@ -42,7 +42,7 @@
 				<h1
 					class="font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-cinema-text sm:text-4xl"
 				>
-					Discover Cinema on Scenora
+					Discover Cinema on Cineva
 				</h1>
 				<p class="mt-3 text-sm leading-relaxed text-cinema-text-muted sm:text-base">
 					Curated film exploration celebrating storytelling, visionary direction, and visual craft.
@@ -123,7 +123,7 @@
 					</p>
 				</div>
 				<a
-					href="/explore?sort=rating"
+					href="/explore?sortBy=vote_average.desc"
 					class="hidden items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold text-cinema-accent hover:underline focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none sm:inline-flex"
 				>
 					<span>View Top Rated</span>
@@ -141,6 +141,6 @@
 		subtitle="Upcoming theatrical premieres scheduled for global release"
 		movies={data.upcoming.movies}
 		error={data.upcoming.error}
-		viewAllHref="/explore?filter=upcoming"
+		viewAllHref="/explore?sortBy=primary_release_date.desc"
 	/>
 </div>

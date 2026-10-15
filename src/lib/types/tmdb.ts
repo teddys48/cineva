@@ -49,6 +49,48 @@ export interface TMDBCastMember {
 	order?: number;
 }
 
+export interface TMDBCreditsResponse {
+	id: number;
+	cast: TMDBCastMember[];
+	crew: TMDBCrewMember[];
+}
+
+export interface TMDBVideo {
+	id: string;
+	iso_639_1?: string;
+	iso_3166_1?: string;
+	key: string;
+	name: string;
+	site: string;
+	size?: number;
+	type: string;
+	official: boolean;
+	published_at?: string;
+}
+
+export interface TMDBVideosResponse {
+	id: number;
+	results: TMDBVideo[];
+}
+
+export interface TMDBProductionCompany {
+	id: number;
+	name: string;
+	logo_path?: string | null;
+	origin_country?: string;
+}
+
+export interface TMDBProductionCountry {
+	iso_3166_1: string;
+	name: string;
+}
+
+export interface TMDBSpokenLanguage {
+	english_name?: string;
+	iso_639_1: string;
+	name: string;
+}
+
 export interface TMDBMovieDetails extends TMDBMovie {
 	credits?: {
 		cast: TMDBCastMember[];
@@ -59,6 +101,9 @@ export interface TMDBMovieDetails extends TMDBMovie {
 	revenue?: number;
 	homepage?: string | null;
 	imdb_id?: string | null;
+	production_companies?: TMDBProductionCompany[];
+	production_countries?: TMDBProductionCountry[];
+	spoken_languages?: TMDBSpokenLanguage[];
 }
 
 /**
@@ -75,4 +120,41 @@ export interface TMDBGenre {
 export interface SectionResult<T> {
 	data: T;
 	error: string | null;
+}
+
+/**
+ * Curated supported TMDB sort options for Explore
+ */
+export type TMDBSortOption =
+	| 'popularity.desc'
+	| 'popularity.asc'
+	| 'vote_average.desc'
+	| 'vote_average.asc'
+	| 'primary_release_date.desc'
+	| 'primary_release_date.asc';
+
+export interface SearchMoviesOptions {
+	query: string;
+	page?: number;
+	language?: string;
+	include_adult?: boolean;
+	primary_release_year?: number;
+}
+
+export interface DiscoverMoviesOptions {
+	page?: number;
+	with_genres?: string | number;
+	primary_release_year?: number;
+	min_rating?: number;
+	sort_by?: TMDBSortOption | string;
+	language?: string;
+	vote_count_gte?: number;
+}
+
+export interface ExploreFilters {
+	genre?: string;
+	year?: number;
+	minRating?: number;
+	sortBy?: string;
+	page?: number;
 }

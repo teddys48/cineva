@@ -1,4 +1,12 @@
-import type { TMDBMovie, TMDBMovieDetails, TMDBPaginatedResponse } from '#lib/types/tmdb';
+import type {
+	TMDBMovie,
+	TMDBMovieDetails,
+	TMDBPaginatedResponse,
+	TMDBGenre,
+	SearchMoviesOptions,
+	DiscoverMoviesOptions,
+	TMDBSortOption
+} from '#lib/types/tmdb';
 import type { Movie } from '#lib/types/movie';
 
 interface PrivateEnv {
@@ -15,6 +23,7 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 const DEFAULT_TIMEOUT_MS = 8000;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
+const GENRES_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours cache for genres
 
 /**
  * Standard TMDB movie genre dictionary
@@ -40,6 +49,18 @@ export const TMDB_GENRES: Record<number, string> = {
 	10752: 'War',
 	37: 'Western'
 };
+
+/**
+ * Valid TMDB discover sorting modes
+ */
+export const VALID_SORT_OPTIONS: TMDBSortOption[] = [
+	'popularity.desc',
+	'popularity.asc',
+	'vote_average.desc',
+	'vote_average.asc',
+	'primary_release_date.desc',
+	'primary_release_date.asc'
+];
 
 /**
  * Custom error class for TMDB client operations
@@ -184,7 +205,7 @@ export function parseReleaseDate(dateStr?: string | null): {
 }
 
 /**
- * Transform a raw TMDB movie object into Scenora's Movie model
+ * Transform a raw TMDB movie object into Cineva's Movie model
  */
 export function mapTMDBMovieToMovie(
 	tmdbMovie: TMDBMovie,
@@ -238,7 +259,7 @@ export function mapTMDBMovieToMovie(
  */
 export async function tmdbFetch<T>(
 	endpoint: string,
-	params: Record<string, string | number | undefined> = {},
+	params: Record<string, string | number | boolean | undefined> = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<T> {
 	const token = getTMDBToken();
@@ -310,10 +331,11 @@ export async function getTrendingMovies(
 	options: { page?: number; language?: string } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
 		'/trending/movie/week',
 		{
-			page: options.page ?? 1,
+			page,
 			language: options.language ?? 'en-US'
 		},
 		fetchFn
@@ -327,10 +349,11 @@ export async function getPopularMovies(
 	options: { page?: number; language?: string } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
 		'/movie/popular',
 		{
-			page: options.page ?? 1,
+			page,
 			language: options.language ?? 'en-US'
 		},
 		fetchFn
@@ -344,10 +367,11 @@ export async function getNowPlayingMovies(
 	options: { page?: number; language?: string } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
 		'/movie/now_playing',
 		{
-			page: options.page ?? 1,
+			page,
 			language: options.language ?? 'en-US'
 		},
 		fetchFn
@@ -361,10 +385,11 @@ export async function getUpcomingMovies(
 	options: { page?: number; language?: string } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
 		'/movie/upcoming',
 		{
-			page: options.page ?? 1,
+			page,
 			language: options.language ?? 'en-US'
 		},
 		fetchFn
@@ -387,4 +412,119 @@ export async function getMovieDetails(
 		},
 		fetchFn
 	);
+}
+
+/**
+ * Search movies by title with query validation and pagination bounds
+ */
+export async function searchMovies(
+	options: SearchMoviesOptions,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const trimmedQuery = (options.query || '').trim();
+	if (!trimmedQuery) {
+		return {
+			page: 1,
+			results: [],
+			total_pages: 0,
+			total_results: 0
+		};
+	}
+
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
+		'/search/movie',
+		{
+			query: trimmedQuery.slice(0, 150),
+			page,
+			language: options.language ?? 'en-US',
+			include_adult: options.include_adult ?? false,
+			primary_release_year: options.primary_release_year
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Discover movies with multi-criteria filters and sorting
+ */
+export async function discoverMovies(
+	options: DiscoverMoviesOptions = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	// Normalize sort option
+	let sortBy = options.sort_by || 'popularity.desc';
+	if (!VALID_SORT_OPTIONS.includes(sortBy as TMDBSortOption)) {
+		sortBy = 'popularity.desc';
+	}
+
+	const params: Record<string, string | number | boolean | undefined> = {
+		page,
+		sort_by: sortBy,
+		language: options.language ?? 'en-US',
+		include_adult: false
+	};
+
+	if (options.with_genres) {
+		params['with_genres'] = String(options.with_genres);
+	}
+
+	if (
+		options.primary_release_year &&
+		options.primary_release_year >= 1888 &&
+		options.primary_release_year <= new Date().getFullYear() + 5
+	) {
+		params['primary_release_year'] = options.primary_release_year;
+	}
+
+	if (
+		typeof options.min_rating === 'number' &&
+		!isNaN(options.min_rating) &&
+		options.min_rating > 0
+	) {
+		const clampedRating = Math.min(10, Math.max(0, options.min_rating));
+		params['vote_average.gte'] = clampedRating;
+		// Ensure minimum votes for rated discovery so outlier 1-vote movies don't skew results
+		params['vote_count.gte'] = options.vote_count_gte ?? 10;
+	} else if (sortBy === 'vote_average.desc') {
+		// When sorting by highest rating without explicit minRating, enforce a robust threshold of votes
+		params['vote_count.gte'] = options.vote_count_gte ?? 100;
+	}
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>('/discover/movie', params, fetchFn);
+}
+
+/**
+ * Fetch movie genre dictionary from TMDB with fallback to static genres
+ */
+export async function getMovieGenres(fetchFn: typeof fetch = fetch): Promise<TMDBGenre[]> {
+	const cacheKey = 'tmdb_genres_list_all';
+	const cached = getCached<TMDBGenre[]>(cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	try {
+		const response = await tmdbFetch<{ genres: TMDBGenre[] }>(
+			'/genre/movie/list',
+			{ language: 'en-US' },
+			fetchFn
+		);
+		if (response && Array.isArray(response.genres) && response.genres.length > 0) {
+			setCached<TMDBGenre[]>(cacheKey, response.genres, GENRES_CACHE_TTL_MS);
+			return response.genres;
+		}
+	} catch {
+		// Fallback gracefully to standard static TMDB genres if TMDB call fails
+	}
+
+	const fallbackGenres: TMDBGenre[] = Object.entries(TMDB_GENRES).map(([id, name]) => ({
+		id: Number(id),
+		name
+	}));
+	setCached<TMDBGenre[]>(cacheKey, fallbackGenres, CACHE_TTL_MS);
+	return fallbackGenres;
 }
