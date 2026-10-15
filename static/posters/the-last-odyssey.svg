@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#091522"/>
+      <stop offset="100%" stop-color="#15314D"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="65%" stop-color="rgba(11,13,18,0.2)"/>
+      <stop offset="100%" stop-color="rgba(11,13,18,0.95)"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <ellipse cx="300" cy="360" rx="140" ry="60" fill="none" stroke="#60A5FA" stroke-width="4" transform="rotate(-20 300 360)"/><circle cx="300" cy="360" r="60" fill="#15314D" stroke="#60A5FA" stroke-width="2"/>
+  <rect width="600" height="900" fill="url(#shade)"/>
+  <text x="50" y="100" fill="#60A5FA" font-family="'Space Grotesk', sans-serif" font-size="14" letter-spacing="4" font-weight="600">CINEVA SELECTION</text>
+  <text x="50" y="750" fill="#F4F4F5" font-family="'Space Grotesk', sans-serif" font-size="36" font-weight="700">The Last Odyssey</text>
+  <text x="50" y="790" fill="#9299A8" font-family="'Inter', sans-serif" font-size="14" letter-spacing="2" font-weight="500">VOYAGE PAST THE KNOWN</text>
+</svg>

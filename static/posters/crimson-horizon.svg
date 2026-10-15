@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1C0D0D"/>
+      <stop offset="100%" stop-color="#421717"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="65%" stop-color="rgba(11,13,18,0.2)"/>
+      <stop offset="100%" stop-color="rgba(11,13,18,0.95)"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <path d="M100 520 L300 280 L500 520 Z" fill="#421717" stroke="#EF4444" stroke-width="3"/><circle cx="300" cy="220" r="55" fill="#EF4444" opacity="0.8"/>
+  <rect width="600" height="900" fill="url(#shade)"/>
+  <text x="50" y="100" fill="#EF4444" font-family="'Space Grotesk', sans-serif" font-size="14" letter-spacing="4" font-weight="600">CINEVA SELECTION</text>
+  <text x="50" y="750" fill="#F4F4F5" font-family="'Space Grotesk', sans-serif" font-size="36" font-weight="700">Crimson Horizon</text>
+  <text x="50" y="790" fill="#9299A8" font-family="'Inter', sans-serif" font-size="14" letter-spacing="2" font-weight="500">DUST AND RECKONING</text>
+</svg>

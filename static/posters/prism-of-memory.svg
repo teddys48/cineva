@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#17131F"/>
+      <stop offset="100%" stop-color="#322247"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="65%" stop-color="rgba(11,13,18,0.2)"/>
+      <stop offset="100%" stop-color="rgba(11,13,18,0.95)"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <polygon points="300,200 450,480 150,480" fill="none" stroke="#EC4899" stroke-width="5"/><line x1="300" y1="200" x2="300" y2="480" stroke="#EC4899" stroke-width="2" stroke-dasharray="6 6"/>
+  <rect width="600" height="900" fill="url(#shade)"/>
+  <text x="50" y="100" fill="#EC4899" font-family="'Space Grotesk', sans-serif" font-size="14" letter-spacing="4" font-weight="600">CINEVA SELECTION</text>
+  <text x="50" y="750" fill="#F4F4F5" font-family="'Space Grotesk', sans-serif" font-size="36" font-weight="700">Prism of Memory</text>
+  <text x="50" y="790" fill="#9299A8" font-family="'Inter', sans-serif" font-size="14" letter-spacing="2" font-weight="500">REFRACTIONS OF THE SELF</text>
+</svg>

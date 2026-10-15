@@ -1,0 +1,100 @@
+@import 'tailwindcss';
+
+@theme {
+	--font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+	--font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+	--color-cinema-bg: var(--color-cinema-bg);
+	--color-cinema-surface: var(--color-cinema-surface);
+	--color-cinema-elevated: var(--color-cinema-elevated);
+	--color-cinema-muted: var(--color-cinema-muted);
+	--color-cinema-text: var(--color-cinema-text);
+	--color-cinema-text-muted: var(--color-cinema-text-muted);
+	--color-cinema-accent: var(--color-cinema-accent);
+	--color-cinema-accent-hover: var(--color-cinema-accent-hover);
+	--color-cinema-accent-foreground: var(--color-cinema-accent-foreground);
+	--color-cinema-border: var(--color-cinema-border);
+	--color-cinema-border-subtle: var(--color-cinema-border-subtle);
+}
+
+:root,
+.dark,
+[data-theme='dark'] {
+	color-scheme: dark;
+	--color-cinema-bg: #0b0d12;
+	--color-cinema-surface: #151922;
+	--color-cinema-elevated: #202632;
+	--color-cinema-muted: #1a1f2b;
+	--color-cinema-text: #f4f4f5;
+	--color-cinema-text-muted: #9299a8;
+	--color-cinema-accent: #b7f36b;
+	--color-cinema-accent-hover: #a5e454;
+	--color-cinema-accent-foreground: #0b0d12;
+	--color-cinema-border: #242b3a;
+	--color-cinema-border-subtle: #1c222e;
+}
+
+.light,
+[data-theme='light'] {
+	color-scheme: light;
+	--color-cinema-bg: #f8f9fa;
+	--color-cinema-surface: #ffffff;
+	--color-cinema-elevated: #eef1f5;
+	--color-cinema-muted: #e4e7ed;
+	--color-cinema-text: #0f1218;
+	--color-cinema-text-muted: #596173;
+	--color-cinema-accent: #166534;
+	--color-cinema-accent-hover: #14532d;
+	--color-cinema-accent-foreground: #ffffff;
+	--color-cinema-border: #dbe0ea;
+	--color-cinema-border-subtle: #eef1f5;
+}
+
+body {
+	background-color: var(--color-cinema-bg);
+	color: var(--color-cinema-text);
+	font-family: var(--font-sans);
+	min-height: 100dvh;
+	margin: 0;
+	overflow-x: hidden;
+	transition:
+		background-color 0.2s ease,
+		color 0.2s ease;
+}
+
+/* Custom horizontal scrollbar styling */
+.hide-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+.hide-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+	height: 6px;
+	width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+	background: var(--color-cinema-surface);
+	border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background: var(--color-cinema-border);
+	border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: var(--color-cinema-text-muted);
+}
+
+/* Reduced motion guarantee */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

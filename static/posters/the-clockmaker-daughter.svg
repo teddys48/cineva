@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16121E"/>
+      <stop offset="100%" stop-color="#322543"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="65%" stop-color="rgba(11,13,18,0.2)"/>
+      <stop offset="100%" stop-color="rgba(11,13,18,0.95)"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <circle cx="300" cy="350" r="120" fill="none" stroke="#A855F7" stroke-width="5" stroke-dasharray="12 8"/><line x1="300" y1="350" x2="300" y2="270" stroke="#A855F7" stroke-width="4"/><line x1="300" y1="350" x2="360" y2="350" stroke="#A855F7" stroke-width="4"/><circle cx="300" cy="350" r="12" fill="#A855F7"/>
+  <rect width="600" height="900" fill="url(#shade)"/>
+  <text x="50" y="100" fill="#A855F7" font-family="'Space Grotesk', sans-serif" font-size="14" letter-spacing="4" font-weight="600">CINEVA SELECTION</text>
+  <text x="50" y="750" fill="#F4F4F5" font-family="'Space Grotesk', sans-serif" font-size="36" font-weight="700">The Clockmaker's Daughter</text>
+  <text x="50" y="790" fill="#9299A8" font-family="'Inter', sans-serif" font-size="14" letter-spacing="2" font-weight="500">TIMEWORK & WONDER</text>
+</svg>
