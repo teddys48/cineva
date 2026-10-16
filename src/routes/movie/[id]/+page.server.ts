@@ -6,11 +6,13 @@ import {
 	getMovieVideos,
 	getSimilarMovies,
 	getMovieRecommendations,
+	getMovieImages,
+	normalizeTMDBImages,
 	mapTMDBMovieDetailsToDetail,
 	mapTMDBMovieToMovie,
 	TMDBError
 } from '#lib/server/tmdb';
-import type { Movie } from '#lib/types/movie';
+import type { Movie, MovieImagesGallery } from '#lib/types/movie';
 
 export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	const rawId = params.id;
@@ -30,15 +32,22 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 		'cache-control': 'public, max-age=180, s-maxage=300'
 	});
 
-	// Concurrently fetch primary details and optional resources
-	const [detailsResult, creditsResult, videosResult, similarResult, recommendationsResult] =
-		await Promise.allSettled([
-			getMovieDetails(movieId, {}, fetch),
-			getMovieCredits(movieId, fetch),
-			getMovieVideos(movieId, fetch),
-			getSimilarMovies(movieId, { page: 1 }, fetch),
-			getMovieRecommendations(movieId, { page: 1 }, fetch)
-		]);
+	// Concurrently fetch primary details and optional resources including artwork gallery
+	const [
+		detailsResult,
+		creditsResult,
+		videosResult,
+		similarResult,
+		recommendationsResult,
+		imagesResult
+	] = await Promise.allSettled([
+		getMovieDetails(movieId, {}, fetch),
+		getMovieCredits(movieId, fetch),
+		getMovieVideos(movieId, fetch),
+		getSimilarMovies(movieId, { page: 1 }, fetch),
+		getMovieRecommendations(movieId, { page: 1 }, fetch),
+		getMovieImages(movieId, { include_image_language: 'en,id,null' }, fetch)
+	]);
 
 	// Primary movie details handling
 	if (detailsResult.status === 'rejected') {
@@ -58,6 +67,27 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 			: null;
 
 	const movieDetail = mapTMDBMovieDetailsToDetail(rawDetails, creditsData, videosData);
+
+	// Process Artwork Gallery
+	let gallery: MovieImagesGallery;
+	if (imagesResult.status === 'fulfilled' && imagesResult.value) {
+		gallery = normalizeTMDBImages(
+			imagesResult.value,
+			rawDetails.poster_path,
+			rawDetails.backdrop_path
+		);
+	} else {
+		gallery = {
+			posters: [],
+			backdrops: [],
+			logos: [],
+			all: [],
+			totalCount: 0,
+			error: 'Movie artwork could not be retrieved at this time.'
+		};
+	}
+
+	movieDetail.gallery = gallery;
 
 	// Process Similar movies
 	let similarMovies: Movie[] = [];
@@ -98,6 +128,7 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 		recommendations: {
 			movies: recommendationsMovies,
 			error: recommendationsError
-		}
+		},
+		gallery
 	};
 };

@@ -10,7 +10,9 @@ import type {
 	TMDBVideosResponse,
 	TMDBVideo,
 	TMDBPerson,
-	TMDBPersonMovieCredits
+	TMDBPersonMovieCredits,
+	TMDBMovieImagesResponse,
+	TMDBImageItem
 } from '#lib/types/tmdb';
 import type {
 	Movie,
@@ -18,8 +20,14 @@ import type {
 	MovieCastMember,
 	MovieCrewMember,
 	MovieVideo,
-	KeyCrewPerson
+	KeyCrewPerson,
+	MovieImage,
+	MovieImageType,
+	MovieImagesGallery
 } from '#lib/types/movie';
+import { getLogoUrl, getTMDBImageUrl } from '#lib/images';
+
+export { getLogoUrl, getTMDBImageUrl };
 import type { PersonProfile, PersonCreditMovie } from '#lib/types/person';
 
 interface PrivateEnv {
@@ -707,6 +715,23 @@ export async function getMovieVideos(
 }
 
 /**
+ * Fetch image collections (posters, backdrops, logos) for a movie from TMDB
+ */
+export async function getMovieImages(
+	movieId: number | string,
+	options: { include_image_language?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBMovieImagesResponse> {
+	return tmdbFetch<TMDBMovieImagesResponse>(
+		`/movie/${movieId}/images`,
+		{
+			include_image_language: options.include_image_language ?? 'en,id,null'
+		},
+		fetchFn
+	);
+}
+
+/**
  * Fetch similar movies
  */
 export async function getSimilarMovies(
@@ -1082,5 +1107,132 @@ export function mapTMDBPersonToProfile(
 		actingCredits,
 		directingCredits,
 		totalCreditsCount: uniqueMovieIds.size
+	};
+}
+
+/**
+ * Normalize raw TMDB image collections into a clean, typed MovieImagesGallery
+ */
+export function normalizeTMDBImages(
+	rawImages?: TMDBMovieImagesResponse | null,
+	primaryPosterPath?: string | null,
+	primaryBackdropPath?: string | null
+): MovieImagesGallery {
+	if (!rawImages) {
+		return {
+			posters: [],
+			backdrops: [],
+			logos: [],
+			all: [],
+			totalCount: 0,
+			error: null
+		};
+	}
+
+	const formatLanguage = (iso: string | null | undefined): string => {
+		if (!iso || iso.trim() === '') return 'Textless';
+		const lower = iso.trim().toLowerCase();
+		if (lower === 'null' || lower === 'xx') return 'Textless';
+		const formatted = formatLanguageName(lower);
+		return formatted || lower.toUpperCase();
+	};
+
+	const cleanPrimaryPoster = primaryPosterPath
+		? primaryPosterPath.startsWith('/')
+			? primaryPosterPath
+			: `/${primaryPosterPath}`
+		: null;
+
+	const cleanPrimaryBackdrop = primaryBackdropPath
+		? primaryBackdropPath.startsWith('/')
+			? primaryBackdropPath
+			: `/${primaryBackdropPath}`
+		: null;
+
+	const mapItem = (item: TMDBImageItem, type: MovieImageType, index: number): MovieImage => {
+		const filePath = item.file_path || '';
+		const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+		let thumbUrl: string;
+		let previewUrl: string;
+		const originalUrl = getTMDBImageUrl(normalizedPath, 'original');
+
+		if (type === 'poster') {
+			thumbUrl = getPosterUrl(normalizedPath, 'w500');
+			previewUrl = getPosterUrl(normalizedPath, 'w780');
+		} else if (type === 'backdrop') {
+			thumbUrl = getBackdropUrl(normalizedPath, 'w780');
+			previewUrl = getBackdropUrl(normalizedPath, 'w1280');
+		} else {
+			thumbUrl = getLogoUrl(normalizedPath, 'w300');
+			previewUrl = getLogoUrl(normalizedPath, 'w500');
+		}
+
+		const isPrimary =
+			type === 'poster'
+				? cleanPrimaryPoster !== null && normalizedPath === cleanPrimaryPoster
+				: type === 'backdrop'
+					? cleanPrimaryBackdrop !== null && normalizedPath === cleanPrimaryBackdrop
+					: false;
+
+		return {
+			id: `${type}-${index}-${normalizedPath.replace(/[^a-zA-Z0-9]/g, '')}`,
+			filePath: normalizedPath,
+			type,
+			aspectRatio:
+				typeof item.aspect_ratio === 'number' && item.aspect_ratio > 0
+					? Number(item.aspect_ratio.toFixed(3))
+					: type === 'poster'
+						? 0.667
+						: type === 'backdrop'
+							? 1.778
+							: 1.0,
+			width: item.width || 0,
+			height: item.height || 0,
+			iso_639_1: item.iso_639_1 || null,
+			languageLabel: formatLanguage(item.iso_639_1),
+			voteAverage:
+				typeof item.vote_average === 'number' && !Number.isNaN(item.vote_average)
+					? Number(item.vote_average.toFixed(1))
+					: undefined,
+			voteCount: item.vote_count ?? 0,
+			thumbUrl,
+			previewUrl,
+			originalUrl,
+			isPrimary
+		};
+	};
+
+	const dedupeCategory = (
+		items: TMDBImageItem[] | undefined,
+		type: MovieImageType
+	): MovieImage[] => {
+		if (!Array.isArray(items)) return [];
+		const seen = new Set<string>();
+		const result: MovieImage[] = [];
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			if (!item || !item.file_path) continue;
+			const normalizedPath = item.file_path.startsWith('/') ? item.file_path : `/${item.file_path}`;
+			if (seen.has(normalizedPath)) continue;
+			seen.add(normalizedPath);
+			result.push(mapItem(item, type, i));
+		}
+		return result;
+	};
+
+	const backdrops = dedupeCategory(rawImages.backdrops, 'backdrop');
+	const posters = dedupeCategory(rawImages.posters, 'poster');
+	const logos = dedupeCategory(rawImages.logos, 'logo');
+
+	const all = [...backdrops, ...posters, ...logos];
+	const totalCount = backdrops.length + posters.length + logos.length;
+
+	return {
+		posters,
+		backdrops,
+		logos,
+		all,
+		totalCount,
+		error: null
 	};
 }

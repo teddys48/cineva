@@ -57,6 +57,40 @@ export interface MovieVideo {
 	publishedAt?: string;
 }
 
+export type MovieImageType = 'poster' | 'backdrop' | 'logo';
+
+export interface MovieImage {
+	id: string;
+	filePath: string;
+	type: MovieImageType;
+	aspectRatio: number;
+	width: number;
+	height: number;
+	iso_639_1: string | null;
+	languageLabel: string;
+	voteAverage?: number;
+	voteCount?: number;
+	thumbUrl: string;
+	previewUrl: string;
+	originalUrl: string;
+	isPrimary?: boolean;
+}
+
+export interface MovieGalleryCategory {
+	id: 'all' | 'posters' | 'backdrops' | 'logos';
+	label: string;
+	count: number;
+}
+
+export interface MovieImagesGallery {
+	posters: MovieImage[];
+	backdrops: MovieImage[];
+	logos: MovieImage[];
+	all: MovieImage[];
+	totalCount: number;
+	error: string | null;
+}
+
 export interface MovieDetail extends Movie {
 	originalTitle?: string;
 	originalLanguage?: string;
@@ -80,4 +114,5 @@ export interface MovieDetail extends Movie {
 	};
 	trailer?: MovieVideo | null;
 	videos: MovieVideo[];
+	gallery?: MovieImagesGallery;
 }

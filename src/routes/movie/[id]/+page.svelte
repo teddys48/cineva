@@ -5,16 +5,28 @@
 	import MovieCard from '#lib/components/movie/MovieCard.svelte';
 	import MovieCast from '#lib/components/movie/MovieCast.svelte';
 	import MovieInfo from '#lib/components/movie/MovieInfo.svelte';
+	import MovieArtworkGallery from '#lib/components/movie/MovieArtworkGallery.svelte';
 	import TrailerModal from '#lib/components/movie/TrailerModal.svelte';
 	import WatchlistButton from '#lib/components/movie/WatchlistButton.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
 	import { personalizationState } from '#lib/personalization.svelte';
-	import { Star, Play, Share2, ArrowLeft, Film, Info, Sparkles } from 'lucide-svelte';
+	import { Star, Play, Share2, ArrowLeft, Film, Info, Sparkles, Images } from 'lucide-svelte';
 
 	let { data }: PageProps = $props();
 	let movie = $derived(data.movie);
 	let similar = $derived(data.similar);
 	let recommendations = $derived(data.recommendations);
+	let gallery = $derived(
+		data.gallery ||
+			movie.gallery || {
+				posters: [],
+				backdrops: [],
+				logos: [],
+				all: [],
+				totalCount: 0,
+				error: null
+			}
+	);
 
 	// State
 	let trailerModalOpen = $state(false);
@@ -55,6 +67,13 @@
 	function scrollToDetails() {
 		if (typeof document !== 'undefined') {
 			const target = document.getElementById('details');
+			target?.scrollIntoView({ behavior: 'smooth' });
+		}
+	}
+
+	function scrollToGallery() {
+		if (typeof document !== 'undefined') {
+			const target = document.getElementById('gallery');
 			target?.scrollIntoView({ behavior: 'smooth' });
 		}
 	}
@@ -278,6 +297,17 @@
 							<span>Film Facts</span>
 						</button>
 
+						{#if gallery.totalCount > 0}
+							<button
+								type="button"
+								onclick={scrollToGallery}
+								class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 text-sm font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+							>
+								<Images class="h-4 w-4 text-cinema-text-muted" />
+								<span>Gallery ({gallery.totalCount})</span>
+							</button>
+						{/if}
+
 						<WatchlistButton {movie} variant="button" />
 
 						<button
@@ -299,7 +329,7 @@
 		</div>
 	</section>
 
-	<!-- Main Content Area: Facts, Cast, Crew, Similar, and Recommendations -->
+	<!-- Main Content Area: Facts, Cast, Crew, Gallery, Similar, and Recommendations -->
 	<div class="mx-auto max-w-7xl space-y-16 px-4 py-14 sm:px-6 lg:px-8">
 		<!-- Section 1: Detailed Specifications & Context -->
 		<section id="details" class="scroll-mt-24 border-b border-cinema-border pb-16">
@@ -311,7 +341,16 @@
 			<MovieCast cast={movie.cast} keyCrew={movie.keyCrew} />
 		</section>
 
-		<!-- Section 3: Similar Movies (Rendered only when data is available or error occurred) -->
+		<!-- Section 3: Official Artwork Gallery -->
+		<section
+			id="gallery"
+			class="scroll-mt-24 border-b border-cinema-border pb-16"
+			aria-label="Official Artwork Gallery"
+		>
+			<MovieArtworkGallery {gallery} movieTitle={movie.title} />
+		</section>
+
+		<!-- Section 4: Similar Movies (Rendered only when data is available or error occurred) -->
 		{#if similar.error}
 			<section aria-label="Similar Movies" class="border-b border-cinema-border pb-16">
 				<SectionError title="Similar Titles Unavailable" message={similar.error} />
@@ -343,7 +382,7 @@
 			</section>
 		{/if}
 
-		<!-- Section 4: Recommended Movies (Rendered only when data is available or error occurred) -->
+		<!-- Section 5: Recommended Movies (Rendered only when data is available or error occurred) -->
 		{#if recommendations.error}
 			<section aria-label="Recommended Titles">
 				<SectionError title="Recommendations Unavailable" message={recommendations.error} />

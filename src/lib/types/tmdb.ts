@@ -107,6 +107,26 @@ export interface TMDBMovieDetails extends TMDBMovie {
 }
 
 /**
+ * TMDB Raw Image Assets (/movie/{id}/images)
+ */
+export interface TMDBImageItem {
+	aspect_ratio: number;
+	height: number;
+	iso_639_1: string | null;
+	file_path: string;
+	vote_average?: number;
+	vote_count?: number;
+	width: number;
+}
+
+export interface TMDBMovieImagesResponse {
+	id: number;
+	backdrops: TMDBImageItem[];
+	posters: TMDBImageItem[];
+	logos: TMDBImageItem[];
+}
+
+/**
  * Standard TMDB Genre definition
  */
 export interface TMDBGenre {
