@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import type { PageProps } from './$types';
+	import type { PersonCreditMovie } from '#lib/types/person';
 	import MovieCard from '#lib/components/movie/MovieCard.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
@@ -12,7 +13,10 @@
 		Film,
 		ExternalLink,
 		Clapperboard,
-		Sparkles
+		Sparkles,
+		PenTool,
+		Award,
+		Video
 	} from 'lucide-svelte';
 
 	let { data }: PageProps = $props();
@@ -32,34 +36,109 @@
 			: `${person.biography.slice(0, BIO_CHAR_LIMIT).trim()}...`
 	);
 
+	type RoleCategory = 'acting' | 'directing' | 'writing' | 'producing' | 'cinematography' | 'other';
+
+	interface RoleTab {
+		id: RoleCategory;
+		label: string;
+		count: number;
+		credits: PersonCreditMovie[];
+		icon: typeof User;
+		defaultSubtitle: string;
+	}
+
+	let roleTabs = $derived<RoleTab[]>([
+		{
+			id: 'acting',
+			label: 'Acting',
+			count: person.actingCredits?.length || 0,
+			credits: person.actingCredits || [],
+			icon: User,
+			defaultSubtitle: 'Cast'
+		},
+		{
+			id: 'directing',
+			label: 'Directing',
+			count: person.directingCredits?.length || 0,
+			credits: person.directingCredits || [],
+			icon: Clapperboard,
+			defaultSubtitle: 'Director'
+		},
+		{
+			id: 'writing',
+			label: 'Writing',
+			count: person.writingCredits?.length || 0,
+			credits: person.writingCredits || [],
+			icon: PenTool,
+			defaultSubtitle: 'Screenplay / Writer'
+		},
+		{
+			id: 'producing',
+			label: 'Producing',
+			count: person.producingCredits?.length || 0,
+			credits: person.producingCredits || [],
+			icon: Award,
+			defaultSubtitle: 'Producer'
+		},
+		{
+			id: 'cinematography',
+			label: 'Cinematography',
+			count: person.cinematographyCredits?.length || 0,
+			credits: person.cinematographyCredits || [],
+			icon: Video,
+			defaultSubtitle: 'Cinematographer'
+		},
+		{
+			id: 'other',
+			label: 'Other Crew',
+			count: person.otherCrewCredits?.length || 0,
+			credits: person.otherCrewCredits || [],
+			icon: Film,
+			defaultSubtitle: 'Crew'
+		}
+	]);
+
+	// Filter available roles with at least 1 credit
+	let availableRoles = $derived(roleTabs.filter((r) => r.count > 0));
+
 	// Active filmography category tab
-	// Default to directing if known for directing and has directing credits, else acting, else whatever has credits
-	let userSelectedCategory = $state<'acting' | 'directing' | null>(null);
-	let activeCategory = $derived<'acting' | 'directing'>(
-		userSelectedCategory ??
-			(person.knownForDepartment === 'Directing' && person.directingCredits.length > 0
-				? 'directing'
-				: person.actingCredits.length > 0
-					? 'acting'
-					: person.directingCredits.length > 0
-						? 'directing'
-						: 'acting')
-	);
+	let userSelectedCategory = $state<RoleCategory | null>(null);
+
+	let activeCategory = $derived.by<RoleCategory>(() => {
+		if (
+			userSelectedCategory &&
+			roleTabs.some((r) => r.id === userSelectedCategory && r.count > 0)
+		) {
+			return userSelectedCategory;
+		}
+		const dept = (person.knownForDepartment || '').toLowerCase();
+		if (dept.includes('direct') && (person.directingCredits?.length ?? 0) > 0) return 'directing';
+		if (dept.includes('writ') && (person.writingCredits?.length ?? 0) > 0) return 'writing';
+		if (dept.includes('produc') && (person.producingCredits?.length ?? 0) > 0) return 'producing';
+		if (
+			(dept.includes('camera') || dept.includes('cinemat')) &&
+			(person.cinematographyCredits?.length ?? 0) > 0
+		)
+			return 'cinematography';
+		if ((person.actingCredits?.length ?? 0) > 0) return 'acting';
+		if (availableRoles.length > 0) return availableRoles[0].id;
+		return 'acting';
+	});
+
+	let currentTab = $derived(roleTabs.find((r) => r.id === activeCategory) || roleTabs[0]);
 
 	// Filmography pagination / show more
 	let showAllCredits = $state(false);
 	const INITIAL_CREDITS_LIMIT = 16;
 
-	let currentCredits = $derived(
-		activeCategory === 'acting' ? person.actingCredits : person.directingCredits
-	);
+	let currentCredits = $derived(currentTab.credits);
 
 	let visibleCredits = $derived(
 		showAllCredits ? currentCredits : currentCredits.slice(0, INITIAL_CREDITS_LIMIT)
 	);
 
 	// Reset showAllCredits when category changes
-	function selectCategory(category: 'acting' | 'directing') {
+	function selectCategory(category: RoleCategory) {
 		userSelectedCategory = category;
 		showAllCredits = false;
 	}
@@ -289,39 +368,28 @@
 				</p>
 			</div>
 
-			<!-- Category Filter Tabs -->
+			<!-- Role Category Filter Tabs -->
 			<div
-				class="inline-flex rounded-xl border border-cinema-border bg-cinema-surface p-1 shadow-xs"
+				class="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-cinema-border bg-cinema-surface p-1.5 shadow-xs"
 				role="tablist"
 				aria-label="Filmography Categories"
 			>
-				<button
-					type="button"
-					role="tab"
-					aria-selected={activeCategory === 'acting'}
-					onclick={() => selectCategory('acting')}
-					class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all {activeCategory ===
-					'acting'
-						? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
-						: 'text-cinema-text-muted hover:text-cinema-text'}"
-				>
-					<User class="h-3.5 w-3.5" />
-					<span>Acting ({person.actingCredits.length})</span>
-				</button>
-
-				<button
-					type="button"
-					role="tab"
-					aria-selected={activeCategory === 'directing'}
-					onclick={() => selectCategory('directing')}
-					class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all {activeCategory ===
-					'directing'
-						? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
-						: 'text-cinema-text-muted hover:text-cinema-text'}"
-				>
-					<Clapperboard class="h-3.5 w-3.5" />
-					<span>Directing ({person.directingCredits.length})</span>
-				</button>
+				{#each availableRoles.length > 0 ? availableRoles : roleTabs.slice(0, 2) as tab (tab.id)}
+					{@const IconComponent = tab.icon}
+					<button
+						type="button"
+						role="tab"
+						aria-selected={activeCategory === tab.id}
+						onclick={() => selectCategory(tab.id)}
+						class="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all {activeCategory ===
+						tab.id
+							? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+							: 'text-cinema-text-muted hover:text-cinema-text'}"
+					>
+						<IconComponent class="h-3.5 w-3.5" />
+						<span>{tab.label} ({tab.count})</span>
+					</button>
+				{/each}
 			</div>
 		</div>
 
@@ -342,7 +410,7 @@
 							? credit.character
 								? `as ${credit.character}`
 								: 'Cast'
-							: 'Director'}
+							: credit.job || currentTab.defaultSubtitle}
 					/>
 				{/each}
 			</div>
@@ -358,7 +426,7 @@
 						<span>
 							{showAllCredits
 								? 'Show Less'
-								: `Show All ${currentCredits.length} ${activeCategory === 'acting' ? 'Acting' : 'Directing'} Titles`}
+								: `Show All ${currentCredits.length} ${currentTab.label} Titles`}
 						</span>
 					</button>
 				</div>
@@ -366,10 +434,8 @@
 		{:else}
 			<!-- Empty State for Current Category -->
 			<EmptyState
-				title="No {activeCategory === 'acting' ? 'Acting' : 'Directing'} Credits Found"
-				description="There are currently no {activeCategory === 'acting'
-					? 'acting'
-					: 'directing'} credits cataloged for {person.name}."
+				title="No {currentTab.label} Credits Found"
+				description="There are currently no {currentTab.label.toLowerCase()} credits cataloged for {person.name}."
 			/>
 		{/if}
 	</div>

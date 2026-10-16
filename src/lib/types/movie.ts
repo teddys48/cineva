@@ -25,6 +25,11 @@ export interface Genre {
 	movieCount: number;
 }
 
+export interface MovieGenreInfo {
+	id: number;
+	name: string;
+}
+
 export interface MovieCastMember {
 	id: number;
 	name: string;
@@ -44,7 +49,28 @@ export interface MovieCrewMember {
 export interface KeyCrewPerson {
 	id: number;
 	name: string;
+	job?: string;
+	department?: string;
 	profileUrl?: string;
+}
+
+export interface ProductionCompanyInfo {
+	id: number;
+	name: string;
+	logoPath?: string | null;
+	logoUrl?: string;
+	originCountry?: string;
+}
+
+export interface ProductionCountryInfo {
+	iso_3166_1: string;
+	name: string;
+}
+
+export interface SpokenLanguageInfo {
+	iso_639_1: string;
+	name: string;
+	englishName?: string;
 }
 
 export interface MovieVideo {
@@ -94,6 +120,7 @@ export interface MovieImagesGallery {
 export interface MovieDetail extends Movie {
 	originalTitle?: string;
 	originalLanguage?: string;
+	originalLanguageCode?: string;
 	status?: string;
 	budget?: number;
 	budgetText?: string;
@@ -102,7 +129,11 @@ export interface MovieDetail extends Movie {
 	homepage?: string;
 	imdbId?: string;
 	productionCompanies: string[];
+	productionCompaniesList?: ProductionCompanyInfo[];
 	productionCountries: string[];
+	productionCountriesList?: ProductionCountryInfo[];
+	spokenLanguagesList?: SpokenLanguageInfo[];
+	genresList?: MovieGenreInfo[];
 	cast: MovieCastMember[];
 	crew: MovieCrewMember[];
 	keyCrew: {
@@ -111,6 +142,14 @@ export interface MovieDetail extends Movie {
 		producers: string[];
 		cinematography: string[];
 		directorsList?: KeyCrewPerson[];
+		screenplayList?: KeyCrewPerson[];
+		producersList?: KeyCrewPerson[];
+		cinematographyList?: KeyCrewPerson[];
+		composersList?: KeyCrewPerson[];
+		editorsList?: KeyCrewPerson[];
+		productionDesignList?: KeyCrewPerson[];
+		artDirectionList?: KeyCrewPerson[];
+		costumeDesignList?: KeyCrewPerson[];
 	};
 	trailer?: MovieVideo | null;
 	videos: MovieVideo[];

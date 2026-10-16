@@ -261,11 +261,16 @@
 					{#if movie.genres && movie.genres.length > 0}
 						<div class="mt-4 flex flex-wrap items-center justify-center gap-2 md:justify-start">
 							{#each movie.genres as genre (genre)}
-								<span
-									class="rounded-full border border-cinema-border bg-cinema-surface px-3 py-1 text-xs font-medium text-cinema-text shadow-xs"
+								{@const genreObj = movie.genresList?.find(
+									(g) => g.name.toLowerCase() === genre.toLowerCase()
+								)}
+								<a
+									href="/explore?genre=${genreObj ? genreObj.id : encodeURIComponent(genre)}"
+									class="rounded-full border border-cinema-border bg-cinema-surface px-3 py-1 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/60 hover:text-cinema-accent focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+									title="Explore ${genre} films"
 								>
 									{genre}
-								</span>
+								</a>
 							{/each}
 						</div>
 					{/if}
@@ -338,7 +343,7 @@
 
 		<!-- Section 2: Filmmakers and Principal Cast -->
 		<section class="border-b border-cinema-border pb-16">
-			<MovieCast cast={movie.cast} keyCrew={movie.keyCrew} />
+			<MovieCast cast={movie.cast} keyCrew={movie.keyCrew} crew={movie.crew} />
 		</section>
 
 		<!-- Section 3: Official Artwork Gallery -->

@@ -9,8 +9,10 @@ import type {
 	TMDBCreditsResponse,
 	TMDBVideosResponse,
 	TMDBVideo,
+	TMDBCompanyDetails,
 	TMDBPerson,
 	TMDBPersonMovieCredits,
+	TMDBPersonCrewCredit,
 	TMDBMovieImagesResponse,
 	TMDBImageItem
 } from '#lib/types/tmdb';
@@ -21,6 +23,10 @@ import type {
 	MovieCrewMember,
 	MovieVideo,
 	KeyCrewPerson,
+	ProductionCompanyInfo,
+	ProductionCountryInfo,
+	SpokenLanguageInfo,
+	MovieGenreInfo,
 	MovieImage,
 	MovieImageType,
 	MovieImagesGallery
@@ -231,6 +237,22 @@ export function formatLanguageName(langCode?: string | null): string | undefined
 }
 
 /**
+ * Format country ISO 3166-1 code to human-readable English name
+ */
+export function formatCountryName(countryCode?: string | null): string | undefined {
+	if (!countryCode || typeof countryCode !== 'string' || countryCode.trim() === '')
+		return undefined;
+	const code = countryCode.trim().toUpperCase();
+	try {
+		const displayNames = new Intl.DisplayNames(['en'], { type: 'region' });
+		const name = displayNames.of(code);
+		return name || code;
+	} catch {
+		return code;
+	}
+}
+
+/**
  * Select the best official trailer or video from TMDB video results
  */
 export function selectBestTrailer(videos: TMDBVideo[] | null | undefined): MovieVideo | null {
@@ -424,53 +446,129 @@ export function mapTMDBMovieDetailsToDetail(
 		if (cast.length >= 30) break;
 	}
 
-	// Curate crew: extract key roles
+	// Curate crew: extract key roles with IDs and names
 	const directors: string[] = [];
 	const directorsList: KeyCrewPerson[] = [];
 	const seenDirectorIds = new Set<number>();
+
 	const screenplay: string[] = [];
+	const screenplayList: KeyCrewPerson[] = [];
+	const seenScreenplayIds = new Set<number>();
+
 	const producers: string[] = [];
+	const producersList: KeyCrewPerson[] = [];
+	const seenProducerIds = new Set<number>();
+
 	const cinematography: string[] = [];
+	const cinematographyList: KeyCrewPerson[] = [];
+	const seenCinematographyIds = new Set<number>();
+
+	const composersList: KeyCrewPerson[] = [];
+	const seenComposerIds = new Set<number>();
+
+	const editorsList: KeyCrewPerson[] = [];
+	const seenEditorIds = new Set<number>();
+
+	const productionDesignList: KeyCrewPerson[] = [];
+	const seenProdDesignIds = new Set<number>();
+
+	const artDirectionList: KeyCrewPerson[] = [];
+	const seenArtDirectionIds = new Set<number>();
+
+	const costumeDesignList: KeyCrewPerson[] = [];
+	const seenCostumeDesignIds = new Set<number>();
+
 	const crew: MovieCrewMember[] = [];
+	const seenCrewKeys = new Set<string>();
 
 	for (const member of crewData) {
-		if (!member.name) continue;
+		if (!member.name || !member.id) continue;
 		const name = member.name.trim();
-		const job = member.job?.trim();
+		const job = member.job?.trim() || 'Crew';
+		const dept = member.department?.trim() || 'Production';
+		const profileUrl = getProfileUrl(member.profile_path, 'w185');
 
 		if (job === 'Director') {
 			if (!directors.includes(name)) {
 				directors.push(name);
 			}
-			if (member.id && !seenDirectorIds.has(member.id)) {
+			if (!seenDirectorIds.has(member.id)) {
 				seenDirectorIds.add(member.id);
-				directorsList.push({
-					id: member.id,
-					name,
-					profileUrl: getProfileUrl(member.profile_path, 'w185')
-				});
+				directorsList.push({ id: member.id, name, job, department: dept, profileUrl });
 			}
 		} else if (
-			['Screenplay', 'Writer', 'Story', 'Author'].includes(job) &&
-			!screenplay.includes(name)
+			['Screenplay', 'Writer', 'Story', 'Author', 'Co-Writer', 'Original Story'].includes(job) ||
+			dept === 'Writing'
 		) {
-			screenplay.push(name);
-		} else if (['Producer', 'Executive Producer'].includes(job) && !producers.includes(name)) {
-			producers.push(name);
+			if (!screenplay.includes(name)) {
+				screenplay.push(name);
+			}
+			if (!seenScreenplayIds.has(member.id)) {
+				seenScreenplayIds.add(member.id);
+				screenplayList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
 		} else if (
-			['Director of Photography', 'Cinematography'].includes(job) &&
-			!cinematography.includes(name)
+			['Producer', 'Executive Producer', 'Co-Producer', 'Associate Producer'].includes(job) ||
+			(dept === 'Production' && job.includes('Producer'))
 		) {
-			cinematography.push(name);
+			if (!producers.includes(name)) {
+				producers.push(name);
+			}
+			if (!seenProducerIds.has(member.id)) {
+				seenProducerIds.add(member.id);
+				producersList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (
+			['Director of Photography', 'Cinematography', 'Cinematographer'].includes(job) ||
+			dept === 'Camera'
+		) {
+			if (!cinematography.includes(name)) {
+				cinematography.push(name);
+			}
+			if (!seenCinematographyIds.has(member.id)) {
+				seenCinematographyIds.add(member.id);
+				cinematographyList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (
+			['Original Music Composer', 'Composer', 'Music', 'Original Score'].includes(job) ||
+			(dept === 'Sound' && (job.includes('Composer') || job.includes('Music')))
+		) {
+			if (!seenComposerIds.has(member.id)) {
+				seenComposerIds.add(member.id);
+				composersList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (['Editor', 'Film Editor', 'Co-Editor'].includes(job) || dept === 'Editing') {
+			if (!seenEditorIds.has(member.id)) {
+				seenEditorIds.add(member.id);
+				editorsList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (['Production Design', 'Production Designer'].includes(job)) {
+			if (!seenProdDesignIds.has(member.id)) {
+				seenProdDesignIds.add(member.id);
+				productionDesignList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (['Art Direction', 'Art Director', 'Supervising Art Director'].includes(job)) {
+			if (!seenArtDirectionIds.has(member.id)) {
+				seenArtDirectionIds.add(member.id);
+				artDirectionList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (['Costume Design', 'Costume Designer'].includes(job)) {
+			if (!seenCostumeDesignIds.has(member.id)) {
+				seenCostumeDesignIds.add(member.id);
+				costumeDesignList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
 		}
 
-		if (crew.length < 20) {
+		// Keep credited crew members deduplicated by ID + job
+		const crewKey = `${member.id}:${job}`;
+		if (!seenCrewKeys.has(crewKey)) {
+			seenCrewKeys.add(crewKey);
 			crew.push({
 				id: member.id,
 				name,
-				job: member.job || 'Crew',
-				department: member.department || 'Production',
-				profileUrl: getProfileUrl(member.profile_path, 'w185')
+				job,
+				department: dept,
+				profileUrl
 			});
 		}
 	}
@@ -496,11 +594,48 @@ export function mapTMDBMovieDetailsToDetail(
 			? details.original_title
 			: undefined;
 
+	// Structured production companies
+	const productionCompaniesList: ProductionCompanyInfo[] = (details.production_companies || [])
+		.filter((c) => Boolean(c && c.id && c.name))
+		.map((c) => ({
+			id: c.id,
+			name: c.name.trim(),
+			logoPath: c.logo_path || null,
+			logoUrl: getLogoUrl(c.logo_path, 'w300'),
+			originCountry: c.origin_country || undefined
+		}));
+
+	// Structured production countries
+	const productionCountriesList: ProductionCountryInfo[] = (details.production_countries || [])
+		.filter((c) => Boolean(c && c.iso_3166_1 && c.name))
+		.map((c) => ({
+			iso_3166_1: c.iso_3166_1.trim().toUpperCase(),
+			name: c.name.trim()
+		}));
+
+	// Structured spoken languages
+	const spokenLanguagesList: SpokenLanguageInfo[] = (details.spoken_languages || [])
+		.filter((l) => Boolean(l && l.iso_639_1))
+		.map((l) => ({
+			iso_639_1: l.iso_639_1.trim().toLowerCase(),
+			name: l.name?.trim() || formatLanguageName(l.iso_639_1) || l.iso_639_1,
+			englishName: l.english_name?.trim() || undefined
+		}));
+
+	// Structured genres
+	const genresList: MovieGenreInfo[] = (details.genres || [])
+		.filter((g) => Boolean(g && g.id && g.name))
+		.map((g) => ({
+			id: g.id,
+			name: g.name.trim()
+		}));
+
 	return {
 		...baseMovie,
 		director: directors[0] || baseMovie.director,
 		originalTitle,
 		originalLanguage: formatLanguageName(details.original_language),
+		originalLanguageCode: details.original_language?.trim().toLowerCase() || undefined,
 		status: details.status || undefined,
 		budget: details.budget && details.budget > 0 ? details.budget : undefined,
 		budgetText: formatCurrency(details.budget),
@@ -512,10 +647,14 @@ export function mapTMDBMovieDetailsToDetail(
 			details.production_companies
 				?.map((c) => c.name?.trim())
 				.filter((n): n is string => Boolean(n)) || [],
+		productionCompaniesList,
 		productionCountries:
 			details.production_countries
 				?.map((c) => c.name?.trim())
 				.filter((n): n is string => Boolean(n)) || [],
+		productionCountriesList,
+		spokenLanguagesList,
+		genresList,
 		cast,
 		crew,
 		keyCrew: {
@@ -523,7 +662,15 @@ export function mapTMDBMovieDetailsToDetail(
 			screenplay,
 			producers,
 			cinematography,
-			directorsList
+			directorsList,
+			screenplayList,
+			producersList,
+			cinematographyList,
+			composersList,
+			editorsList,
+			productionDesignList,
+			artDirectionList,
+			costumeDesignList
 		},
 		trailer,
 		videos: mappedVideos
@@ -827,6 +974,18 @@ export async function discoverMovies(
 		params['with_genres'] = String(options.with_genres);
 	}
 
+	if (options.with_companies) {
+		params['with_companies'] = String(options.with_companies);
+	}
+
+	if (options.with_origin_country) {
+		params['with_origin_country'] = String(options.with_origin_country).trim();
+	}
+
+	if (options.with_original_language) {
+		params['with_original_language'] = String(options.with_original_language).trim().toLowerCase();
+	}
+
 	if (
 		options.primary_release_year &&
 		options.primary_release_year >= 1888 &&
@@ -882,6 +1041,16 @@ export async function getMovieGenres(fetchFn: typeof fetch = fetch): Promise<TMD
 	}));
 	setCached<TMDBGenre[]>(cacheKey, fallbackGenres, CACHE_TTL_MS);
 	return fallbackGenres;
+}
+
+/**
+ * Fetch company details by TMDB company ID
+ */
+export async function getCompanyDetails(
+	companyId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBCompanyDetails> {
+	return tmdbFetch<TMDBCompanyDetails>(`/company/${companyId}`, {}, fetchFn);
 }
 
 /**
@@ -1022,18 +1191,8 @@ export function mapTMDBPersonToProfile(
 		});
 	}
 
-	// Process Directing credits (strictly from credits.crew where job === 'Director')
-	const rawCrew = credits?.crew || [];
-	const directingCreditsMap = new Map<number, PersonCreditMovie>();
-
-	for (const item of rawCrew) {
-		if (!item || !item.id || item.job !== 'Director') continue;
-		const movieId = item.id;
-
-		if (directingCreditsMap.has(movieId)) {
-			continue;
-		}
-
+	// Helper to build a PersonCreditMovie from crew item
+	const createCrewCreditMovie = (item: TMDBPersonCrewCredit, jobStr: string): PersonCreditMovie => {
 		const { year, dateText } = parseReleaseDate(item.release_date);
 		let genreNames: string[] = [];
 		if (Array.isArray(item.genre_ids)) {
@@ -1050,7 +1209,7 @@ export function mapTMDBPersonToProfile(
 				? Number(item.vote_average.toFixed(1))
 				: null;
 
-		directingCreditsMap.set(movieId, {
+		return {
 			id: String(item.id),
 			title: item.title || item.original_title || 'Untitled',
 			overview: item.overview || '',
@@ -1060,10 +1219,77 @@ export function mapTMDBPersonToProfile(
 			genres: genreNames,
 			posterUrl: getPosterUrl(item.poster_path, 'w500'),
 			backdropUrl: getBackdropUrl(item.backdrop_path, 'w1280'),
-			job: 'Director',
+			job: jobStr,
+			department: item.department?.trim() || undefined,
 			releaseDateText: dateText,
 			rawReleaseDate: item.release_date || ''
-		});
+		};
+	};
+
+	const rawCrew = credits?.crew || [];
+	const directingCreditsMap = new Map<number, PersonCreditMovie>();
+	const writingCreditsMap = new Map<number, PersonCreditMovie>();
+	const producingCreditsMap = new Map<number, PersonCreditMovie>();
+	const cinematographyCreditsMap = new Map<number, PersonCreditMovie>();
+	const otherCrewCreditsMap = new Map<number, PersonCreditMovie>();
+
+	const addToCategory = (
+		map: Map<number, PersonCreditMovie>,
+		item: TMDBPersonCrewCredit,
+		jobName: string
+	) => {
+		const movieId = item.id;
+		if (map.has(movieId)) {
+			const existing = map.get(movieId)!;
+			if (jobName && existing.job && !existing.job.includes(jobName)) {
+				existing.job = `${existing.job} / ${jobName}`;
+			}
+			return;
+		}
+		map.set(movieId, createCrewCreditMovie(item, jobName));
+	};
+
+	for (const item of rawCrew) {
+		if (!item || !item.id) continue;
+		const job = item.job?.trim() || 'Crew';
+		const dept = item.department?.trim() || '';
+
+		if (job === 'Director') {
+			addToCategory(directingCreditsMap, item, 'Director');
+		} else if (
+			dept === 'Writing' ||
+			[
+				'Screenplay',
+				'Writer',
+				'Story',
+				'Author',
+				'Co-Writer',
+				'Original Story',
+				'Dialogue',
+				'Scenario'
+			].includes(job)
+		) {
+			addToCategory(writingCreditsMap, item, job);
+		} else if (
+			dept === 'Production' ||
+			[
+				'Producer',
+				'Executive Producer',
+				'Co-Producer',
+				'Associate Producer',
+				'Line Producer',
+				'Supervising Producer'
+			].includes(job)
+		) {
+			addToCategory(producingCreditsMap, item, job);
+		} else if (
+			dept === 'Camera' ||
+			['Director of Photography', 'Cinematography', 'Cinematographer'].includes(job)
+		) {
+			addToCategory(cinematographyCreditsMap, item, job);
+		} else {
+			addToCategory(otherCrewCreditsMap, item, job);
+		}
 	}
 
 	// Sort credits: release date descending, with undated entries at the end
@@ -1084,10 +1310,18 @@ export function mapTMDBPersonToProfile(
 
 	const actingCredits = Array.from(actingCreditsMap.values()).sort(sortCreditsDesc);
 	const directingCredits = Array.from(directingCreditsMap.values()).sort(sortCreditsDesc);
+	const writingCredits = Array.from(writingCreditsMap.values()).sort(sortCreditsDesc);
+	const producingCredits = Array.from(producingCreditsMap.values()).sort(sortCreditsDesc);
+	const cinematographyCredits = Array.from(cinematographyCreditsMap.values()).sort(sortCreditsDesc);
+	const otherCrewCredits = Array.from(otherCrewCreditsMap.values()).sort(sortCreditsDesc);
 
 	const uniqueMovieIds = new Set([
 		...Array.from(actingCreditsMap.keys()),
-		...Array.from(directingCreditsMap.keys())
+		...Array.from(directingCreditsMap.keys()),
+		...Array.from(writingCreditsMap.keys()),
+		...Array.from(producingCreditsMap.keys()),
+		...Array.from(cinematographyCreditsMap.keys()),
+		...Array.from(otherCrewCreditsMap.keys())
 	]);
 
 	return {
@@ -1106,6 +1340,10 @@ export function mapTMDBPersonToProfile(
 		homepage,
 		actingCredits,
 		directingCredits,
+		writingCredits,
+		producingCredits,
+		cinematographyCredits,
+		otherCrewCredits,
 		totalCreditsCount: uniqueMovieIds.size
 	};
 }

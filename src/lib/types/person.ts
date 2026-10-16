@@ -23,5 +23,9 @@ export interface PersonProfile {
 	homepage?: string;
 	actingCredits: PersonCreditMovie[];
 	directingCredits: PersonCreditMovie[];
+	writingCredits: PersonCreditMovie[];
+	producingCredits: PersonCreditMovie[];
+	cinematographyCredits: PersonCreditMovie[];
+	otherCrewCredits: PersonCreditMovie[];
 	totalCreditsCount: number;
 }

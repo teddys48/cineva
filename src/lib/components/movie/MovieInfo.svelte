@@ -8,7 +8,8 @@
 		DollarSign,
 		TrendingUp,
 		ExternalLink,
-		Clapperboard
+		Clapperboard,
+		Languages
 	} from 'lucide-svelte';
 
 	interface Props {
@@ -25,10 +26,15 @@
 	);
 
 	const hasProductionCompanies = $derived(
-		movie.productionCompanies && movie.productionCompanies.length > 0
+		(movie.productionCompaniesList && movie.productionCompaniesList.length > 0) ||
+			(movie.productionCompanies && movie.productionCompanies.length > 0)
 	);
 	const hasProductionCountries = $derived(
-		movie.productionCountries && movie.productionCountries.length > 0
+		(movie.productionCountriesList && movie.productionCountriesList.length > 0) ||
+			(movie.productionCountries && movie.productionCountries.length > 0)
+	);
+	const hasSpokenLanguages = $derived(
+		movie.spokenLanguagesList && movie.spokenLanguagesList.length > 0
 	);
 </script>
 
@@ -45,14 +51,15 @@
 			</p>
 		</div>
 
-		<!-- Production Companies & Countries if available -->
-		{#if hasProductionCompanies || hasProductionCountries}
+		<!-- Production Companies, Countries & Languages if available -->
+		{#if hasProductionCompanies || hasProductionCountries || hasSpokenLanguages}
 			<div class="rounded-2xl border border-cinema-border/70 bg-cinema-surface/60 p-6 sm:p-7">
 				<h3 class="font-['Space_Grotesk'] text-base font-semibold text-cinema-text">
 					Production Details
 				</h3>
 
-				<div class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+				<div class="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2">
+					<!-- Production Companies -->
 					{#if hasProductionCompanies}
 						<div>
 							<div
@@ -61,12 +68,26 @@
 								<Building2 class="h-3.5 w-3.5 text-cinema-accent" />
 								<span>Production Companies</span>
 							</div>
-							<p class="mt-1.5 text-sm text-cinema-text">
-								{movie.productionCompanies.join(' &bull; ')}
-							</p>
+							<div class="mt-2.5 flex flex-wrap items-center gap-2">
+								{#if movie.productionCompaniesList && movie.productionCompaniesList.length > 0}
+									{#each movie.productionCompaniesList as company (company.id)}
+										<a
+											href="/company/{company.id}"
+											class="inline-flex items-center gap-1.5 rounded-lg border border-cinema-border bg-cinema-surface px-2.5 py-1 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/50 hover:text-cinema-accent focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+										>
+											<span>{company.name}</span>
+										</a>
+									{/each}
+								{:else}
+									<p class="text-sm text-cinema-text">
+										{movie.productionCompanies.join(' • ')}
+									</p>
+								{/if}
+							</div>
 						</div>
 					{/if}
 
+					<!-- Countries of Origin -->
 					{#if hasProductionCountries}
 						<div>
 							<div
@@ -75,8 +96,37 @@
 								<Globe class="h-3.5 w-3.5 text-cinema-accent" />
 								<span>Countries of Origin</span>
 							</div>
-							<p class="mt-1.5 text-sm text-cinema-text">
-								{movie.productionCountries.join(', ')}
+							<div class="mt-2.5 flex flex-wrap items-center gap-2">
+								{#if movie.productionCountriesList && movie.productionCountriesList.length > 0}
+									{#each movie.productionCountriesList as country (country.iso_3166_1)}
+										<a
+											href="/country/{country.iso_3166_1.toLowerCase()}"
+											class="inline-flex items-center gap-1.5 rounded-lg border border-cinema-border bg-cinema-surface px-2.5 py-1 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/50 hover:text-cinema-accent focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+											title="Explore movies produced in {country.name}"
+										>
+											<span>{country.name}</span>
+										</a>
+									{/each}
+								{:else}
+									<p class="text-sm text-cinema-text">
+										{movie.productionCountries.join(', ')}
+									</p>
+								{/if}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Spoken Languages -->
+					{#if hasSpokenLanguages}
+						<div class="sm:col-span-2">
+							<div
+								class="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-cinema-text-muted uppercase"
+							>
+								<Languages class="h-3.5 w-3.5 text-cinema-accent" />
+								<span>Spoken Languages</span>
+							</div>
+							<p class="mt-2 text-sm text-cinema-text">
+								{movie.spokenLanguagesList?.map((l) => l.name).join(', ')}
 							</p>
 						</div>
 					{/if}
@@ -189,7 +239,19 @@
 							<Globe class="h-3.5 w-3.5" />
 							<span>Original Language</span>
 						</dt>
-						<dd class="font-medium text-cinema-text">{movie.originalLanguage}</dd>
+						<dd class="text-right font-medium text-cinema-text">
+							{#if movie.originalLanguageCode}
+								<a
+									href="/language/{movie.originalLanguageCode.toLowerCase()}"
+									class="transition-colors hover:text-cinema-accent hover:underline focus-visible:rounded-xs focus-visible:ring-1 focus-visible:ring-cinema-accent focus-visible:outline-none"
+									title="Discover movies in {movie.originalLanguage}"
+								>
+									{movie.originalLanguage}
+								</a>
+							{:else}
+								{movie.originalLanguage}
+							{/if}
+						</dd>
 					</div>
 				{/if}
 

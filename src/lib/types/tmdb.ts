@@ -80,6 +80,17 @@ export interface TMDBProductionCompany {
 	origin_country?: string;
 }
 
+export interface TMDBCompanyDetails {
+	id: number;
+	name: string;
+	description?: string;
+	headquarters?: string;
+	homepage?: string;
+	logo_path?: string | null;
+	origin_country?: string;
+	parent_company?: { id: number; name: string; logo_path?: string | null } | null;
+}
+
 export interface TMDBProductionCountry {
 	iso_3166_1: string;
 	name: string;
@@ -164,6 +175,9 @@ export interface SearchMoviesOptions {
 export interface DiscoverMoviesOptions {
 	page?: number;
 	with_genres?: string | number;
+	with_companies?: string | number;
+	with_origin_country?: string;
+	with_original_language?: string;
 	primary_release_year?: number;
 	min_rating?: number;
 	sort_by?: TMDBSortOption | string;
