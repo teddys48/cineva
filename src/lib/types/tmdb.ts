@@ -158,3 +158,62 @@ export interface ExploreFilters {
 	sortBy?: string;
 	page?: number;
 }
+
+/**
+ * TMDB Person and Filmography response types
+ */
+export interface TMDBPerson {
+	id: number;
+	name: string;
+	biography?: string;
+	birthday?: string | null;
+	deathday?: string | null;
+	place_of_birth?: string | null;
+	profile_path?: string | null;
+	known_for_department?: string;
+	also_known_as?: string[];
+	gender?: number;
+	popularity?: number;
+	homepage?: string | null;
+	imdb_id?: string | null;
+}
+
+export interface TMDBPersonCastCredit {
+	id: number;
+	title?: string;
+	original_title?: string;
+	character?: string;
+	poster_path?: string | null;
+	backdrop_path?: string | null;
+	release_date?: string;
+	vote_average?: number;
+	vote_count?: number;
+	overview?: string;
+	genre_ids?: number[];
+	popularity?: number;
+	adult?: boolean;
+	order?: number;
+}
+
+export interface TMDBPersonCrewCredit {
+	id: number;
+	title?: string;
+	original_title?: string;
+	job: string;
+	department?: string;
+	poster_path?: string | null;
+	backdrop_path?: string | null;
+	release_date?: string;
+	vote_average?: number;
+	vote_count?: number;
+	overview?: string;
+	genre_ids?: number[];
+	popularity?: number;
+	adult?: boolean;
+}
+
+export interface TMDBPersonMovieCredits {
+	id: number;
+	cast: TMDBPersonCastCredit[];
+	crew: TMDBPersonCrewCredit[];
+}

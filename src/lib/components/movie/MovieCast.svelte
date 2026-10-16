@@ -12,11 +12,16 @@
 	// Set of broken images to fallback gracefully
 	let imageErrors = $state<Record<number, boolean>>({});
 
+	// Expand/collapse cast limit
+	let showAllCast = $state(false);
+	const INITIAL_CAST_LIMIT = 12;
+
 	function handleImageError(id: number) {
 		imageErrors[id] = true;
 	}
 
 	const hasCast = $derived(cast && cast.length > 0);
+	const visibleCast = $derived(showAllCast ? cast : cast.slice(0, INITIAL_CAST_LIMIT));
 	const hasDirectors = $derived(keyCrew?.directors && keyCrew.directors.length > 0);
 	const hasWriters = $derived(keyCrew?.screenplay && keyCrew.screenplay.length > 0);
 	const hasProducers = $derived(keyCrew?.producers && keyCrew.producers.length > 0);
@@ -46,7 +51,20 @@
 								<span>Director{keyCrew.directors.length > 1 ? 's' : ''}</span>
 							</div>
 							<p class="text-sm font-medium text-cinema-text">
-								{keyCrew.directors.join(', ')}
+								{#if keyCrew.directorsList && keyCrew.directorsList.length > 0}
+									{#each keyCrew.directorsList as director, idx (director.id)}
+										{#if idx > 0},
+										{/if}
+										<a
+											href="/person/{director.id}"
+											class="transition-colors hover:text-cinema-accent hover:underline focus-visible:rounded-xs focus-visible:ring-1 focus-visible:ring-cinema-accent focus-visible:outline-none"
+										>
+											{director.name}
+										</a>
+									{/each}
+								{:else}
+									{keyCrew.directors.join(', ')}
+								{/if}
 							</p>
 						</div>
 					{/if}
@@ -114,9 +132,11 @@
 				</div>
 
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-					{#each cast as member (member.id)}
-						<div
-							class="group flex flex-col overflow-hidden rounded-xl border border-cinema-border bg-cinema-surface shadow-xs transition-transform duration-200 hover:-translate-y-0.5"
+					{#each visibleCast as member (member.id)}
+						<a
+							href="/person/{member.id}"
+							class="group flex flex-col overflow-hidden rounded-xl border border-cinema-border bg-cinema-surface shadow-xs transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+							aria-label="View profile for {member.name}"
 						>
 							<!-- Aspect Ratio 3:4 for Actor Headshot -->
 							<div class="relative aspect-[3/4] w-full overflow-hidden bg-cinema-elevated">
@@ -144,7 +164,7 @@
 							<!-- Actor and Role Info -->
 							<div class="flex flex-1 flex-col p-3">
 								<span
-									class="line-clamp-1 font-['Space_Grotesk'] text-xs font-semibold text-cinema-text sm:text-sm"
+									class="line-clamp-1 font-['Space_Grotesk'] text-xs font-semibold text-cinema-text transition-colors group-hover:text-cinema-accent sm:text-sm"
 									title={member.name}
 								>
 									{member.name}
@@ -158,9 +178,21 @@
 									</span>
 								{/if}
 							</div>
-						</div>
+						</a>
 					{/each}
 				</div>
+
+				{#if cast.length > INITIAL_CAST_LIMIT}
+					<div class="mt-8 flex justify-center">
+						<button
+							type="button"
+							onclick={() => (showAllCast = !showAllCast)}
+							class="inline-flex items-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 py-2.5 text-xs font-semibold text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+						>
+							<span>{showAllCast ? 'Show Less Cast' : `Show All Cast (${cast.length})`}</span>
+						</button>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</section>

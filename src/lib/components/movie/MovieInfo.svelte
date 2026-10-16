@@ -7,7 +7,8 @@
 		Building2,
 		DollarSign,
 		TrendingUp,
-		ExternalLink
+		ExternalLink,
+		Clapperboard
 	} from 'lucide-svelte';
 
 	interface Props {
@@ -121,6 +122,36 @@
 			<h3 class="font-['Space_Grotesk'] text-lg font-bold text-cinema-text">Film Specifications</h3>
 
 			<dl class="mt-5 divide-y divide-cinema-border/60 text-sm">
+				<!-- Director(s) -->
+				{#if movie.keyCrew?.directorsList && movie.keyCrew.directorsList.length > 0}
+					<div class="flex items-center justify-between py-3">
+						<dt class="flex items-center gap-1.5 text-xs font-medium text-cinema-text-muted">
+							<Clapperboard class="h-3.5 w-3.5" />
+							<span>Director{movie.keyCrew.directorsList.length > 1 ? 's' : ''}</span>
+						</dt>
+						<dd class="text-right text-xs font-medium text-cinema-text">
+							{#each movie.keyCrew.directorsList as director, i (director.id)}
+								{#if i > 0},
+								{/if}
+								<a
+									href="/person/{director.id}"
+									class="transition-colors hover:text-cinema-accent hover:underline focus-visible:rounded-xs focus-visible:ring-1 focus-visible:ring-cinema-accent focus-visible:outline-none"
+								>
+									{director.name}
+								</a>
+							{/each}
+						</dd>
+					</div>
+				{:else if movie.director}
+					<div class="flex items-center justify-between py-3">
+						<dt class="flex items-center gap-1.5 text-xs font-medium text-cinema-text-muted">
+							<Clapperboard class="h-3.5 w-3.5" />
+							<span>Director</span>
+						</dt>
+						<dd class="text-right text-xs font-medium text-cinema-text">{movie.director}</dd>
+					</div>
+				{/if}
+
 				<!-- Status -->
 				{#if movie.status}
 					<div class="flex items-center justify-between py-3">

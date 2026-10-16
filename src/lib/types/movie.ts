@@ -41,6 +41,12 @@ export interface MovieCrewMember {
 	profileUrl: string;
 }
 
+export interface KeyCrewPerson {
+	id: number;
+	name: string;
+	profileUrl?: string;
+}
+
 export interface MovieVideo {
 	id: string;
 	key: string;
@@ -70,6 +76,7 @@ export interface MovieDetail extends Movie {
 		screenplay: string[];
 		producers: string[];
 		cinematography: string[];
+		directorsList?: KeyCrewPerson[];
 	};
 	trailer?: MovieVideo | null;
 	videos: MovieVideo[];

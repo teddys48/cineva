@@ -6,9 +6,10 @@
 	interface Props {
 		movie: Movie;
 		class?: string;
+		subtitle?: string;
 	}
 
-	let { movie, class: className = '' }: Props = $props();
+	let { movie, class: className = '', subtitle }: Props = $props();
 
 	let imageError = $state(false);
 
@@ -100,6 +101,11 @@
 				{movie.title}
 			</a>
 		</h3>
+		{#if subtitle}
+			<p class="mt-0.5 line-clamp-1 text-xs font-medium text-cinema-accent" title={subtitle}>
+				{subtitle}
+			</p>
+		{/if}
 		<div class="mt-1 flex items-center gap-2 text-xs text-cinema-text-muted">
 			{#if movie.releaseYear}
 				<span>{movie.releaseYear}</span>

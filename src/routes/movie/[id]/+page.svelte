@@ -8,7 +8,6 @@
 	import TrailerModal from '#lib/components/movie/TrailerModal.svelte';
 	import WatchlistButton from '#lib/components/movie/WatchlistButton.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
-	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import { personalizationState } from '#lib/personalization.svelte';
 	import { Star, Play, Share2, ArrowLeft, Film, Info, Sparkles } from 'lucide-svelte';
 
@@ -312,76 +311,70 @@
 			<MovieCast cast={movie.cast} keyCrew={movie.keyCrew} />
 		</section>
 
-		<!-- Section 3: Similar Movies -->
-		<section aria-label="Similar Movies" class="border-b border-cinema-border pb-16">
-			<div class="mb-6 flex items-baseline justify-between">
-				<div>
-					<h2 class="font-['Space_Grotesk'] text-xl font-bold text-cinema-text sm:text-2xl">
-						Similar Movies
-					</h2>
-					<p class="mt-1 text-xs text-cinema-text-muted">
-						Titles sharing genre elements, tone, and cinematic styles
-					</p>
-				</div>
-				<a
-					href="/explore"
-					class="text-xs font-semibold text-cinema-accent transition-colors hover:underline"
-				>
-					Browse Catalog
-				</a>
-			</div>
-
-			{#if similar.error}
+		<!-- Section 3: Similar Movies (Rendered only when data is available or error occurred) -->
+		{#if similar.error}
+			<section aria-label="Similar Movies" class="border-b border-cinema-border pb-16">
 				<SectionError title="Similar Titles Unavailable" message={similar.error} />
-			{:else if similar.movies.length > 0}
+			</section>
+		{:else if similar.movies.length > 0}
+			<section aria-label="Similar Movies" class="border-b border-cinema-border pb-16">
+				<div class="mb-6 flex items-baseline justify-between">
+					<div>
+						<h2 class="font-['Space_Grotesk'] text-xl font-bold text-cinema-text sm:text-2xl">
+							Similar Movies
+						</h2>
+						<p class="mt-1 text-xs text-cinema-text-muted">
+							Titles sharing genre elements, tone, and cinematic styles
+						</p>
+					</div>
+					<a
+						href="/explore"
+						class="text-xs font-semibold text-cinema-accent transition-colors hover:underline"
+					>
+						Browse Catalog
+					</a>
+				</div>
+
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-4">
 					{#each similar.movies as simMovie (simMovie.id)}
 						<MovieCard movie={simMovie} />
 					{/each}
 				</div>
-			{:else}
-				<EmptyState
-					title="No Similar Movies Found"
-					description="TMDB has no closely linked titles recorded for this entry."
-				/>
-			{/if}
-		</section>
+			</section>
+		{/if}
 
-		<!-- Section 4: Recommended Movies -->
-		<section aria-label="Recommended Titles">
-			<div class="mb-6 flex items-baseline justify-between">
-				<div class="flex items-center gap-2">
-					<div
-						class="flex h-7 w-7 items-center justify-center rounded-lg bg-cinema-accent/15 text-cinema-accent"
-					>
-						<Sparkles class="h-4 w-4" />
-					</div>
-					<div>
-						<h2 class="font-['Space_Grotesk'] text-xl font-bold text-cinema-text sm:text-2xl">
-							Recommended For You
-						</h2>
-						<p class="mt-0.5 text-xs text-cinema-text-muted">
-							Curated recommendations based on viewer preferences and thematic connections
-						</p>
+		<!-- Section 4: Recommended Movies (Rendered only when data is available or error occurred) -->
+		{#if recommendations.error}
+			<section aria-label="Recommended Titles">
+				<SectionError title="Recommendations Unavailable" message={recommendations.error} />
+			</section>
+		{:else if recommendations.movies.length > 0}
+			<section aria-label="Recommended Titles">
+				<div class="mb-6 flex items-baseline justify-between">
+					<div class="flex items-center gap-2">
+						<div
+							class="flex h-7 w-7 items-center justify-center rounded-lg bg-cinema-accent/15 text-cinema-accent"
+						>
+							<Sparkles class="h-4 w-4" />
+						</div>
+						<div>
+							<h2 class="font-['Space_Grotesk'] text-xl font-bold text-cinema-text sm:text-2xl">
+								Recommended For You
+							</h2>
+							<p class="mt-0.5 text-xs text-cinema-text-muted">
+								Curated recommendations based on viewer preferences and thematic connections
+							</p>
+						</div>
 					</div>
 				</div>
-			</div>
 
-			{#if recommendations.error}
-				<SectionError title="Recommendations Unavailable" message={recommendations.error} />
-			{:else if recommendations.movies.length > 0}
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-4">
 					{#each recommendations.movies as recMovie (recMovie.id)}
 						<MovieCard movie={recMovie} />
 					{/each}
 				</div>
-			{:else}
-				<EmptyState
-					title="No Recommendations Available"
-					description="There are currently no additional recommendations cataloged for this film."
-				/>
-			{/if}
-		</section>
+			</section>
+		{/if}
 	</div>
 </div>
 
