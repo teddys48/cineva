@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { navigating } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { PageData } from './$types';
 	import MovieGrid from '#lib/components/movie/MovieGrid.svelte';
@@ -123,18 +123,45 @@
 	function resetAllFilters() {
 		goto('/explore');
 	}
+
+	let canonicalUrl = $derived(page.url.href);
+	let metaDescription = $derived(
+		currentGenreName
+			? `Explore curated ${currentGenreName} movies, release eras, and ratings powered by TMDB on Scenora.`
+			: 'Explore curated cinema across genres, release eras, and ratings powered by TMDB on Scenora.'
+	);
 </script>
 
 <svelte:head>
 	<title
 		>{currentGenreName
-			? `${currentGenreName} Movies - Explore Cineva`
-			: 'Explore Cinema — Cineva'}</title
+			? `${currentGenreName} Movies — Explore Scenora`
+			: 'Explore Cinema — Scenora'}</title
 	>
+	<meta name="description" content={metaDescription} />
+	<link rel="canonical" href={canonicalUrl} />
+
+	<!-- Open Graph / Social Sharing -->
+	<meta property="og:site_name" content="Scenora" />
 	<meta
-		name="description"
-		content="Explore curated cinema across genres, release eras, and ratings powered by TMDB in Cineva."
+		property="og:title"
+		content={currentGenreName
+			? `${currentGenreName} Movies — Explore Scenora`
+			: 'Explore Cinema — Scenora'}
 	/>
+	<meta property="og:description" content={metaDescription} />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={canonicalUrl} />
+
+	<!-- Twitter Cards -->
+	<meta name="twitter:card" content="summary" />
+	<meta
+		name="twitter:title"
+		content={currentGenreName
+			? `${currentGenreName} Movies — Explore Scenora`
+			: 'Explore Cinema — Scenora'}
+	/>
+	<meta name="twitter:description" content={metaDescription} />
 </svelte:head>
 
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

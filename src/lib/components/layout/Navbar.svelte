@@ -25,7 +25,7 @@
 		<a
 			href="/"
 			class="group flex items-center gap-2.5 rounded-lg py-1 focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
-			aria-label="Cineva Home"
+			aria-label="Scenora Home"
 		>
 			<div
 				class="flex h-9 w-9 items-center justify-center rounded-lg border border-cinema-border bg-cinema-surface text-cinema-accent transition-transform duration-200 group-hover:scale-105 group-hover:border-cinema-accent/40"
@@ -36,7 +36,7 @@
 				<span
 					class="font-['Space_Grotesk'] text-xl font-bold tracking-tight text-cinema-text transition-colors group-hover:text-cinema-accent"
 				>
-					Cineva
+					Scenora
 				</span>
 			</div>
 		</a>

@@ -1,16 +1,24 @@
 export type Theme = 'dark' | 'light';
 
-const STORAGE_KEY = 'cineva-theme';
+const STORAGE_KEY = 'scenora-theme';
+const LEGACY_STORAGE_KEY = 'cineva-theme';
 
-class ThemeState {
+export class ThemeState {
 	current = $state<Theme>('dark');
 
 	constructor() {
 		if (typeof window !== 'undefined') {
-			const isLight =
-				document.documentElement.classList.contains('light') ||
-				document.documentElement.getAttribute('data-theme') === 'light';
-			this.current = isLight ? 'light' : 'dark';
+			const stored =
+				(localStorage.getItem(STORAGE_KEY) as Theme) ||
+				(localStorage.getItem(LEGACY_STORAGE_KEY) as Theme);
+			if (stored === 'light' || stored === 'dark') {
+				this.current = stored;
+			} else {
+				const isLight =
+					document.documentElement.classList.contains('light') ||
+					document.documentElement.getAttribute('data-theme') === 'light';
+				this.current = isLight ? 'light' : 'dark';
+			}
 		}
 	}
 
@@ -20,7 +28,7 @@ class ThemeState {
 			try {
 				localStorage.setItem(STORAGE_KEY, theme);
 			} catch {
-				// Local storage disabled or quota exceeded
+				// Ignore localStorage quota/private errors
 			}
 
 			if (theme === 'light') {

@@ -1,3 +1,8 @@
-# allow crawling everything by default
+# Scenora - Search Engine Crawler Directives
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /api/
+Disallow: /watchlist
+Disallow: /search?*
+
+Sitemap: /sitemap.xml

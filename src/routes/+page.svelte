@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import type { PageData } from './$types';
 	import HeroMovie from '#lib/components/movie/HeroMovie.svelte';
 	import MovieRow from '#lib/components/movie/MovieRow.svelte';
@@ -18,14 +19,35 @@
 
 	let recentlyViewed = $derived(personalizationState.recentlyViewedMovies);
 	let watchlistMovies = $derived(watchlistState.movies);
+
+	let canonicalUrl = $derived(page.url.href);
+	let ogImage = $derived(data.featured?.backdropUrl || data.featured?.posterUrl || '');
+	const metaDescription =
+		'Discover cinematic masterpieces, trending releases, and upcoming premieres through an editorial film browsing experience on Scenora.';
 </script>
 
 <svelte:head>
-	<title>Cineva — Find your next favorite</title>
-	<meta
-		name="description"
-		content="Discover cinematic masterpieces, trending releases, and upcoming premieres through an editorial film browsing experience."
-	/>
+	<title>Scenora — Find your next favorite</title>
+	<meta name="description" content={metaDescription} />
+	<link rel="canonical" href={canonicalUrl} />
+
+	<!-- Open Graph / Social Sharing -->
+	<meta property="og:site_name" content="Scenora" />
+	<meta property="og:title" content="Scenora — Find your next favorite" />
+	<meta property="og:description" content={metaDescription} />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={canonicalUrl} />
+	{#if ogImage}
+		<meta property="og:image" content={ogImage} />
+	{/if}
+
+	<!-- Twitter Cards -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Scenora — Find your next favorite" />
+	<meta name="twitter:description" content={metaDescription} />
+	{#if ogImage}
+		<meta name="twitter:image" content={ogImage} />
+	{/if}
 </svelte:head>
 
 <div class="flex flex-col">
@@ -47,7 +69,7 @@
 				<h1
 					class="font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-cinema-text sm:text-4xl"
 				>
-					Discover Cinema on Cineva
+					Discover Cinema on Scenora
 				</h1>
 				<p class="mt-3 text-sm leading-relaxed text-cinema-text-muted sm:text-base">
 					Curated film exploration celebrating storytelling, visionary direction, and visual craft.

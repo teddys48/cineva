@@ -3,7 +3,10 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content="Cineva - An elegant, cinematic movie discovery experience." />
+		<meta
+			name="description"
+			content="Scenora - An elegant, cinematic movie discovery experience. Find your next favorite."
+		/>
 		<meta name="theme-color" content="#0B0D12" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +17,8 @@
 		<script>
 			(function () {
 				try {
-					var stored = localStorage.getItem('cineva-theme');
+					var stored =
+						localStorage.getItem('scenora-theme') || localStorage.getItem('cineva-theme');
 					var theme = stored;
 					if (!theme) {
 						var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;

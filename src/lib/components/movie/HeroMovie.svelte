@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Movie } from '#lib/types/movie';
-	import { Star, Bookmark, Play, Check, Film } from 'lucide-svelte';
+	import { Star, Play, Film } from 'lucide-svelte';
+	import WatchlistButton from './WatchlistButton.svelte';
 
 	interface Props {
 		movie: Movie;
@@ -8,12 +9,7 @@
 
 	let { movie }: Props = $props();
 
-	let inWatchlist = $state(false);
 	let backdropError = $state(false);
-
-	function toggleWatchlist() {
-		inWatchlist = !inWatchlist;
-	}
 
 	function handleBackdropError() {
 		backdropError = true;
@@ -119,19 +115,7 @@
 						<span>View Details</span>
 					</a>
 
-					<button
-						type="button"
-						onclick={toggleWatchlist}
-						class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 text-sm font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
-					>
-						{#if inWatchlist}
-							<Check class="h-4 w-4 text-cinema-accent" />
-							<span>In Watchlist</span>
-						{:else}
-							<Bookmark class="h-4 w-4" />
-							<span>Add to Watchlist</span>
-						{/if}
-					</button>
+					<WatchlistButton {movie} variant="button" />
 				</div>
 			</div>
 		</div>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { PageData } from './$types';
 	import type { Movie } from '#lib/types/movie';
 	import MovieGrid from '#lib/components/movie/MovieGrid.svelte';
@@ -48,7 +49,7 @@
 		searchError = data.error || null;
 
 		const searchQuery = data.query?.trim();
-		if (searchQuery && searchQuery.length >= 2 && typeof window !== 'undefined') {
+		if (searchQuery) {
 			untrack(() => {
 				personalizationState.addSearchQuery(searchQuery);
 			});
@@ -60,77 +61,63 @@
 		if (activeAbortController) activeAbortController.abort();
 	});
 
-	async function executeSearch(query: string, page: number = 1, replaceState: boolean = true) {
+	async function executeSearch(query: string, pageNum = 1, updateUrl = true) {
 		const trimmed = query.trim();
 
-		if (debounceTimeout) {
-			clearTimeout(debounceTimeout);
-			debounceTimeout = null;
-		}
-
 		if (!trimmed) {
-			if (activeAbortController) activeAbortController.abort();
-			isLoading = false;
-			movies = [];
 			committedQuery = '';
-			currentPage = 1;
+			movies = [];
 			totalPages = 0;
 			totalResults = 0;
 			searchError = null;
-			goto('/search', { replace: true, reset: false });
+			isLoading = false;
+			if (updateUrl && typeof window !== 'undefined') {
+				goto('/search', { replaceState: true, reset: false });
+			}
 			return;
 		}
 
 		if (activeAbortController) {
 			activeAbortController.abort();
 		}
-
 		activeAbortController = new AbortController();
+
 		isLoading = true;
 		searchError = null;
+		committedQuery = trimmed;
+		currentPage = pageNum;
+
+		if (updateUrl && typeof window !== 'undefined') {
+			const searchUrl = `/search?query=${encodeURIComponent(trimmed)}${pageNum > 1 ? `&page=${pageNum}` : ''}`;
+			goto(searchUrl, { replaceState: false, reset: false });
+		}
 
 		try {
-			const res = await fetch(`/api/search?query=${encodeURIComponent(trimmed)}&page=${page}`, {
-				signal: activeAbortController.signal,
-				headers: {
-					Accept: 'application/json'
-				}
+			const res = await fetch(`/api/search?query=${encodeURIComponent(trimmed)}&page=${pageNum}`, {
+				signal: activeAbortController.signal
 			});
 
 			if (!res.ok) {
-				const errJson = await res.json().catch(() => ({}));
-				throw new Error(errJson.error || `Search failed with status ${res.status}`);
+				throw new Error(`Search request failed with status ${res.status}`);
 			}
 
-			const json = await res.json();
-			movies = json.results || [];
-			totalPages = json.totalPages || 0;
-			totalResults = json.totalResults || 0;
-			committedQuery = trimmed;
-			currentPage = page;
+			const result = await res.json();
+			movies = result.results || [];
+			totalPages = result.totalPages || 0;
+			totalResults = result.totalResults || 0;
+			currentPage = result.page || pageNum;
 
-			// Record in search history only on successful search
-			if (typeof window !== 'undefined') {
-				personalizationState.addSearchQuery(trimmed);
-			}
-
-			// Sync URL state without triggering an unnecessary full navigation
-			const targetUrl =
-				page > 1
-					? `/search?query=${encodeURIComponent(trimmed)}&page=${page}`
-					: `/search?query=${encodeURIComponent(trimmed)}`;
-
-			goto(targetUrl, {
-				replace: replaceState,
-				reset: page !== 1
-			});
+			// Add successfully executed query to user history
+			personalizationState.addSearchQuery(trimmed);
 		} catch (err: unknown) {
 			if (err instanceof Error && err.name === 'AbortError') {
-				// Aborted by a newer query or user action; disregard cleanly
 				return;
 			}
-			searchError =
-				err instanceof Error ? err.message : 'Unable to complete search request. Please try again.';
+			console.error('Client search error:', err);
+			searchError = 'Unable to complete search request. Please try again.';
+			movies = [];
+			totalPages = 0;
+			totalResults = 0;
 		} finally {
 			isLoading = false;
 		}
@@ -138,41 +125,48 @@
 
 	function handleInput(e: Event) {
 		const target = e.target as HTMLInputElement;
-		const val = target.value;
-		queryInput = val;
+		queryInput = target.value;
 
 		if (debounceTimeout) {
 			clearTimeout(debounceTimeout);
 		}
 
-		const trimmed = val.trim();
-		if (!trimmed) {
+		// Instant clear if empty
+		if (!queryInput.trim()) {
 			executeSearch('', 1, true);
 			return;
 		}
 
-		isLoading = true;
+		// 300ms debounce for live typing search
 		debounceTimeout = setTimeout(() => {
-			executeSearch(trimmed, 1, true);
-		}, 350);
+			executeSearch(queryInput, 1, true);
+		}, 300);
 	}
 
 	function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		const trimmed = queryInput.trim();
-		if (trimmed) {
-			executeSearch(trimmed, 1, false);
+		if (debounceTimeout) {
+			clearTimeout(debounceTimeout);
 		}
+		executeSearch(queryInput, 1, true);
 	}
 
 	function handleClear() {
 		queryInput = '';
+		if (debounceTimeout) {
+			clearTimeout(debounceTimeout);
+		}
 		executeSearch('', 1, true);
+		const inputEl = document.getElementById('movie-search-input');
+		if (inputEl) inputEl.focus();
 	}
 
 	function handleSuggestionClick(term: string) {
 		queryInput = term;
-		executeSearch(term, 1, false);
+		if (debounceTimeout) {
+			clearTimeout(debounceTimeout);
+		}
+		executeSearch(term, 1, true);
 	}
 
 	function handleRemoveRecent(e: MouseEvent, term: string) {
@@ -190,18 +184,50 @@
 	function getSearchPageUrl(p: number): string {
 		return `/search?query=${encodeURIComponent(committedQuery)}${p > 1 ? `&page=${p}` : ''}`;
 	}
+
+	let canonicalUrl = $derived(page.url.href);
+	let metaDescription = $derived(
+		committedQuery
+			? `Search results for "${committedQuery}" across the TMDB catalog on Scenora.`
+			: 'Search cinema titles across the TMDB catalog with instant live search on Scenora.'
+	);
 </script>
 
 <svelte:head>
 	<title
 		>{committedQuery
-			? `"${committedQuery}" - Search Cineva`
-			: 'Search Cineva — Find your next favorite'}</title
+			? `"${committedQuery}" — Search Scenora`
+			: 'Search Scenora — Find your next favorite'}</title
 	>
+	<meta name="description" content={metaDescription} />
+	<link rel="canonical" href={canonicalUrl} />
+
+	{#if committedQuery}
+		<!-- Avoid search engine indexing of arbitrary query combinations -->
+		<meta name="robots" content="noindex, follow" />
+	{/if}
+
+	<!-- Open Graph / Social Sharing -->
+	<meta property="og:site_name" content="Scenora" />
 	<meta
-		name="description"
-		content="Search cinema titles across the TMDB catalog with instant live search in Cineva."
+		property="og:title"
+		content={committedQuery
+			? `"${committedQuery}" — Search Scenora`
+			: 'Search Scenora — Find your next favorite'}
 	/>
+	<meta property="og:description" content={metaDescription} />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={canonicalUrl} />
+
+	<!-- Twitter Cards -->
+	<meta name="twitter:card" content="summary" />
+	<meta
+		name="twitter:title"
+		content={committedQuery
+			? `"${committedQuery}" — Search Scenora`
+			: 'Search Scenora — Find your next favorite'}
+	/>
+	<meta name="twitter:description" content={metaDescription} />
 </svelte:head>
 
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -216,7 +242,7 @@
 		<h1
 			class="mt-3 font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-cinema-text sm:text-4xl"
 		>
-			Search Cineva
+			Search Scenora
 		</h1>
 		<p class="mt-2 text-sm text-cinema-text-muted">
 			Find films by title across the official TMDB catalog with real-time matching.

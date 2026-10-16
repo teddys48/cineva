@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
+	import { page } from '$app/state';
 	import MovieCard from '#lib/components/movie/MovieCard.svelte';
 	import MovieCardSkeleton from '#lib/components/movie/MovieCardSkeleton.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
@@ -38,13 +39,13 @@
 		return Array.from(set).sort();
 	});
 
-	// Filter and sort saved movies
+	// Client-side filtering & sorting of saved movies
 	let displayedMovies = $derived.by(() => {
-		let items = watchlistState.getSortedMovies(sortBy);
+		let list = watchlistState.getSortedMovies(sortBy);
 		if (selectedGenre !== 'all') {
-			items = items.filter((m) => m.genres && m.genres.includes(selectedGenre));
+			list = list.filter((m) => m.genres && m.genres.includes(selectedGenre));
 		}
-		return items;
+		return list;
 	});
 
 	function handleSortChange(e: Event) {
@@ -61,14 +62,24 @@
 		watchlistState.clear();
 		isConfirmingClear = false;
 	}
+
+	let canonicalUrl = $derived(page.url.href);
+	const metaDescription =
+		'Manage and explore your personal saved movie list on Scenora with instant offline persistence.';
 </script>
 
 <svelte:head>
-	<title>My Watchlist ({totalCount}) — Cineva</title>
-	<meta
-		name="description"
-		content="Manage and explore your personal saved movie list in Cineva with instant offline persistence."
-	/>
+	<title>My Watchlist ({totalCount}) — Scenora</title>
+	<meta name="description" content={metaDescription} />
+	<link rel="canonical" href={canonicalUrl} />
+	<meta name="robots" content="noindex, nofollow" />
+
+	<!-- Open Graph / Social Sharing -->
+	<meta property="og:site_name" content="Scenora" />
+	<meta property="og:title" content="My Watchlist — Scenora" />
+	<meta property="og:description" content={metaDescription} />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={canonicalUrl} />
 </svelte:head>
 
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

@@ -9,14 +9,14 @@
 		<div class="grid grid-cols-1 gap-8 md:grid-cols-4">
 			<!-- Brand Info -->
 			<div class="md:col-span-2">
-				<a href="/" class="flex items-center gap-2.5" aria-label="Cineva Home">
+				<a href="/" class="flex items-center gap-2.5" aria-label="Scenora Home">
 					<div
 						class="flex h-8 w-8 items-center justify-center rounded-lg border border-cinema-border bg-cinema-surface text-cinema-accent"
 					>
 						<Film class="h-4 w-4" />
 					</div>
 					<span class="font-['Space_Grotesk'] text-xl font-bold tracking-tight text-cinema-text">
-						Cineva
+						Scenora
 					</span>
 				</a>
 				<p class="mt-3 text-sm font-medium text-cinema-accent">Find your next favorite.</p>
@@ -82,7 +82,7 @@
 		<div
 			class="mt-10 flex flex-col items-center justify-between gap-4 border-t border-cinema-border-subtle pt-6 text-xs text-cinema-text-muted sm:flex-row"
 		>
-			<p>&copy; {new Date().getFullYear()} Cineva. Designed for film lovers.</p>
+			<p>&copy; {new Date().getFullYear()} Scenora. Designed for film lovers.</p>
 			<p class="font-mono text-[11px] text-cinema-text-muted/70">Powered by TMDB API v3</p>
 		</div>
 	</div>
