@@ -5,9 +5,18 @@ import type {
 	TMDBGenre,
 	SearchMoviesOptions,
 	DiscoverMoviesOptions,
-	TMDBSortOption
+	TMDBSortOption,
+	TMDBCreditsResponse,
+	TMDBVideosResponse,
+	TMDBVideo
 } from '#lib/types/tmdb';
-import type { Movie } from '#lib/types/movie';
+import type {
+	Movie,
+	MovieDetail,
+	MovieCastMember,
+	MovieCrewMember,
+	MovieVideo
+} from '#lib/types/movie';
 
 interface PrivateEnv {
 	TMDB_ACCESS_TOKEN?: string;
@@ -160,6 +169,17 @@ export function getBackdropUrl(
 }
 
 /**
+ * Build a valid TMDB profile image URL with fallback to empty string
+ */
+export function getProfileUrl(
+	profilePath: string | null | undefined,
+	size: 'w185' | 'h632' | 'original' = 'w185'
+): string {
+	if (!profilePath) return '';
+	return `${TMDB_IMAGE_BASE_URL}/${size}${profilePath.startsWith('/') ? profilePath : `/${profilePath}`}`;
+}
+
+/**
  * Format minutes runtime to readable string, e.g. 145 -> '2h 25m'
  */
 export function formatRuntime(minutes: number | null | undefined): string | undefined {
@@ -169,6 +189,113 @@ export function formatRuntime(minutes: number | null | undefined): string | unde
 	if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
 	if (hours > 0) return `${hours}h`;
 	return `${mins}m`;
+}
+
+/**
+ * Format currency amount to USD string, e.g. 165000000 -> '$165,000,000'
+ */
+export function formatCurrency(amount: number | null | undefined): string | undefined {
+	if (!amount || amount <= 0 || isNaN(amount)) return undefined;
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		maximumFractionDigits: 0
+	}).format(amount);
+}
+
+/**
+ * Format language code (e.g. 'en') to display name (e.g. 'English')
+ */
+export function formatLanguageName(langCode?: string | null): string | undefined {
+	if (!langCode || typeof langCode !== 'string' || langCode.trim() === '') return undefined;
+	const code = langCode.trim().toLowerCase();
+	try {
+		const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+		const name = displayNames.of(code);
+		return name || code.toUpperCase();
+	} catch {
+		return code.toUpperCase();
+	}
+}
+
+/**
+ * Select the best official trailer or video from TMDB video results
+ */
+export function selectBestTrailer(videos: TMDBVideo[] | null | undefined): MovieVideo | null {
+	if (!videos || !Array.isArray(videos) || videos.length === 0) return null;
+
+	const youtubeVideos = videos.filter(
+		(v) => v && v.key && typeof v.key === 'string' && v.site?.toLowerCase() === 'youtube'
+	);
+	if (youtubeVideos.length === 0) return null;
+
+	// 1. Official Trailer
+	const officialTrailer = youtubeVideos.find((v) => v.type === 'Trailer' && v.official === true);
+	if (officialTrailer) {
+		return {
+			id: officialTrailer.id,
+			key: officialTrailer.key,
+			name: officialTrailer.name,
+			site: officialTrailer.site,
+			type: officialTrailer.type,
+			official: true,
+			publishedAt: officialTrailer.published_at
+		};
+	}
+
+	// 2. Any Trailer
+	const anyTrailer = youtubeVideos.find((v) => v.type === 'Trailer');
+	if (anyTrailer) {
+		return {
+			id: anyTrailer.id,
+			key: anyTrailer.key,
+			name: anyTrailer.name,
+			site: anyTrailer.site,
+			type: anyTrailer.type,
+			official: anyTrailer.official ?? false,
+			publishedAt: anyTrailer.published_at
+		};
+	}
+
+	// 3. Official Teaser
+	const officialTeaser = youtubeVideos.find((v) => v.type === 'Teaser' && v.official === true);
+	if (officialTeaser) {
+		return {
+			id: officialTeaser.id,
+			key: officialTeaser.key,
+			name: officialTeaser.name,
+			site: officialTeaser.site,
+			type: officialTeaser.type,
+			official: true,
+			publishedAt: officialTeaser.published_at
+		};
+	}
+
+	// 4. Any Teaser or Clip
+	const anyTeaser = youtubeVideos.find((v) => v.type === 'Teaser' || v.type === 'Clip');
+	if (anyTeaser) {
+		return {
+			id: anyTeaser.id,
+			key: anyTeaser.key,
+			name: anyTeaser.name,
+			site: anyTeaser.site,
+			type: anyTeaser.type,
+			official: anyTeaser.official ?? false,
+			publishedAt: anyTeaser.published_at
+		};
+	}
+
+	// 5. Fallback to first YouTube video
+	const first = youtubeVideos[0];
+	return {
+		id: first.id,
+		key: first.key,
+		name: first.name,
+		site: first.site,
+		type: first.type,
+		official: first.official ?? false,
+		publishedAt: first.published_at
+	};
 }
 
 /**
@@ -205,7 +332,7 @@ export function parseReleaseDate(dateStr?: string | null): {
 }
 
 /**
- * Transform a raw TMDB movie object into Cineva's Movie model
+ * Transform a raw TMDB movie object into Scenora's Movie model
  */
 export function mapTMDBMovieToMovie(
 	tmdbMovie: TMDBMovie,
@@ -251,6 +378,127 @@ export function mapTMDBMovieToMovie(
 		runtime: runtimeStr,
 		isUpcoming: options.isUpcoming,
 		releaseDateText: dateText
+	};
+}
+
+/**
+ * Transform raw TMDB details, credits, and videos into Scenora's MovieDetail model
+ */
+export function mapTMDBMovieDetailsToDetail(
+	details: TMDBMovieDetails,
+	credits?: TMDBCreditsResponse | null,
+	videos?: TMDBVideo[] | null
+): MovieDetail {
+	const baseMovie = mapTMDBMovieToMovie(details);
+	const castData = credits?.cast || details.credits?.cast || [];
+	const crewData = credits?.crew || details.credits?.crew || [];
+
+	// Curate cast: sort by order, dedup by ID, take up to 15
+	const seenCastIds = new Set<number>();
+	const cast: MovieCastMember[] = [];
+	for (const member of castData) {
+		if (!member.id || seenCastIds.has(member.id)) continue;
+		seenCastIds.add(member.id);
+		cast.push({
+			id: member.id,
+			name: member.name || 'Unknown',
+			character: member.character || 'Cast',
+			profileUrl: getProfileUrl(member.profile_path, 'w185'),
+			order: member.order ?? 999
+		});
+		if (cast.length >= 15) break;
+	}
+
+	// Curate crew: extract key roles
+	const directors: string[] = [];
+	const screenplay: string[] = [];
+	const producers: string[] = [];
+	const cinematography: string[] = [];
+	const crew: MovieCrewMember[] = [];
+
+	for (const member of crewData) {
+		if (!member.name) continue;
+		const name = member.name.trim();
+		const job = member.job?.trim();
+
+		if (job === 'Director' && !directors.includes(name)) {
+			directors.push(name);
+		} else if (
+			['Screenplay', 'Writer', 'Story', 'Author'].includes(job) &&
+			!screenplay.includes(name)
+		) {
+			screenplay.push(name);
+		} else if (['Producer', 'Executive Producer'].includes(job) && !producers.includes(name)) {
+			producers.push(name);
+		} else if (
+			['Director of Photography', 'Cinematography'].includes(job) &&
+			!cinematography.includes(name)
+		) {
+			cinematography.push(name);
+		}
+
+		if (crew.length < 20) {
+			crew.push({
+				id: member.id,
+				name,
+				job: member.job || 'Crew',
+				department: member.department || 'Production',
+				profileUrl: getProfileUrl(member.profile_path, 'w185')
+			});
+		}
+	}
+
+	const rawVideos = videos || [];
+	const mappedVideos: MovieVideo[] = rawVideos
+		.filter((v) => v && v.key && v.site?.toLowerCase() === 'youtube')
+		.map((v) => ({
+			id: v.id,
+			key: v.key,
+			name: v.name,
+			site: v.site,
+			type: v.type,
+			official: Boolean(v.official),
+			publishedAt: v.published_at
+		}));
+
+	const trailer = selectBestTrailer(rawVideos);
+
+	// Original title if different from primary title
+	const originalTitle =
+		details.original_title && details.original_title !== details.title
+			? details.original_title
+			: undefined;
+
+	return {
+		...baseMovie,
+		director: directors[0] || baseMovie.director,
+		originalTitle,
+		originalLanguage: formatLanguageName(details.original_language),
+		status: details.status || undefined,
+		budget: details.budget && details.budget > 0 ? details.budget : undefined,
+		budgetText: formatCurrency(details.budget),
+		revenue: details.revenue && details.revenue > 0 ? details.revenue : undefined,
+		revenueText: formatCurrency(details.revenue),
+		homepage: details.homepage || undefined,
+		imdbId: details.imdb_id || undefined,
+		productionCompanies:
+			details.production_companies
+				?.map((c) => c.name?.trim())
+				.filter((n): n is string => Boolean(n)) || [],
+		productionCountries:
+			details.production_countries
+				?.map((c) => c.name?.trim())
+				.filter((n): n is string => Boolean(n)) || [],
+		cast,
+		crew,
+		keyCrew: {
+			directors,
+			screenplay,
+			producers,
+			cinematography
+		},
+		trailer,
+		videos: mappedVideos
 	};
 }
 
@@ -397,18 +645,80 @@ export async function getUpcomingMovies(
 }
 
 /**
- * Fetch full details for a single movie with credits
+ * Fetch full details for a single movie with optional appended resources
  */
 export async function getMovieDetails(
 	movieId: number | string,
-	options: { language?: string } = {},
+	options: { language?: string; append_to_response?: string } = {},
 	fetchFn: typeof fetch = fetch
 ): Promise<TMDBMovieDetails> {
 	return tmdbFetch<TMDBMovieDetails>(
 		`/movie/${movieId}`,
 		{
 			language: options.language ?? 'en-US',
-			append_to_response: 'credits'
+			append_to_response: options.append_to_response
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch credits (cast & crew) for a movie
+ */
+export async function getMovieCredits(
+	movieId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBCreditsResponse> {
+	return tmdbFetch<TMDBCreditsResponse>(
+		`/movie/${movieId}/credits`,
+		{ language: 'en-US' },
+		fetchFn
+	);
+}
+
+/**
+ * Fetch videos (trailers, teasers) for a movie
+ */
+export async function getMovieVideos(
+	movieId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBVideosResponse> {
+	return tmdbFetch<TMDBVideosResponse>(`/movie/${movieId}/videos`, { language: 'en-US' }, fetchFn);
+}
+
+/**
+ * Fetch similar movies
+ */
+export async function getSimilarMovies(
+	movieId: number | string,
+	options: { page?: number; language?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
+		`/movie/${movieId}/similar`,
+		{
+			page,
+			language: options.language ?? 'en-US'
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch recommended movies
+ */
+export async function getMovieRecommendations(
+	movieId: number | string,
+	options: { page?: number; language?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBMovie>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
+		`/movie/${movieId}/recommendations`,
+		{
+			page,
+			language: options.language ?? 'en-US'
 		},
 		fetchFn
 	);
