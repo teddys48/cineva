@@ -297,7 +297,7 @@ describe('Phase 4: Movie Detail Backend & Integration Tests', () => {
 			}
 		];
 
-		it('accurately transforms raw details into Scenora MovieDetail model', () => {
+		it('accurately transforms raw details into Cineva MovieDetail model', () => {
 			const detail = mapTMDBMovieDetailsToDetail(rawMovie, rawCredits, rawVideos);
 
 			expect(detail.id).toBe('157336');

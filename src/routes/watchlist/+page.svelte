@@ -65,18 +65,18 @@
 
 	let canonicalUrl = $derived(page.url.href);
 	const metaDescription =
-		'Manage and explore your personal saved movie list on Scenora with instant offline persistence.';
+		'Manage and explore your personal saved movie list on Cineva with instant offline persistence.';
 </script>
 
 <svelte:head>
-	<title>My Watchlist ({totalCount}) — Scenora</title>
+	<title>My Watchlist ({totalCount}) — Cineva</title>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
 	<meta name="robots" content="noindex, nofollow" />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
-	<meta property="og:title" content="My Watchlist — Scenora" />
+	<meta property="og:site_name" content="Cineva" />
+	<meta property="og:title" content="My Watchlist — Cineva" />
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={canonicalUrl} />

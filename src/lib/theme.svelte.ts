@@ -1,7 +1,7 @@
 export type Theme = 'dark' | 'light';
 
-const STORAGE_KEY = 'scenora-theme';
-const LEGACY_STORAGE_KEY = 'cineva-theme';
+const STORAGE_KEY = 'cineva-theme';
+const LEGACY_STORAGE_KEY = 'scenora-theme';
 
 export class ThemeState {
 	current = $state<Theme>('dark');

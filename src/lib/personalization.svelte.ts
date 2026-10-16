@@ -2,8 +2,10 @@ import { SvelteSet } from 'svelte/reactivity';
 import { untrack } from 'svelte';
 import type { Movie, MovieDetail } from './types/movie';
 
-export const RECENTLY_VIEWED_KEY = 'scenora:recently_viewed';
-export const SEARCH_HISTORY_KEY = 'scenora:search_history';
+export const RECENTLY_VIEWED_KEY = 'cineva:recently_viewed';
+export const LEGACY_RECENTLY_VIEWED_KEY = 'scenora:recently_viewed';
+export const SEARCH_HISTORY_KEY = 'cineva:search_history';
+export const LEGACY_SEARCH_HISTORY_KEY = 'scenora:search_history';
 
 export const MAX_RECENTLY_VIEWED = 10;
 export const MAX_SEARCH_HISTORY = 8;
@@ -61,8 +63,14 @@ export function sanitizeRecentlyViewedItem(raw: unknown): RecentlyViewedItem | n
 			.slice(0, 4);
 	}
 
+	const runtime = typeof record.runtime === 'string' ? record.runtime : undefined;
+
 	let viewedAt = Date.now();
-	if (typeof record.viewedAt === 'number' && !Number.isNaN(record.viewedAt)) {
+	if (
+		typeof record.viewedAt === 'number' &&
+		!Number.isNaN(record.viewedAt) &&
+		record.viewedAt > 0
+	) {
 		viewedAt = record.viewedAt;
 	}
 
@@ -74,7 +82,7 @@ export function sanitizeRecentlyViewedItem(raw: unknown): RecentlyViewedItem | n
 		releaseYear,
 		rating,
 		genres,
-		runtime: typeof record.runtime === 'string' ? record.runtime : undefined,
+		runtime,
 		viewedAt
 	};
 }
@@ -84,25 +92,27 @@ export function parseRecentlyViewed(rawJson: string | null): RecentlyViewedItem[
 
 	try {
 		const parsed: unknown = JSON.parse(rawJson);
-		let list: unknown[] = [];
+		if (!parsed || typeof parsed !== 'object') return [];
+
+		let rawItems: unknown[] = [];
 		if (Array.isArray(parsed)) {
-			list = parsed;
+			rawItems = parsed;
 		} else if (
-			parsed &&
-			typeof parsed === 'object' &&
 			'items' in parsed &&
 			Array.isArray((parsed as { items: unknown[] }).items)
 		) {
-			list = (parsed as { items: unknown[] }).items;
+			rawItems = (parsed as { items: unknown[] }).items;
+		} else {
+			return [];
 		}
 
 		const items: RecentlyViewedItem[] = [];
-		const seen = new SvelteSet<string>();
+		const seenIds = new SvelteSet<string>();
 
-		for (const item of list) {
-			const sanitized = sanitizeRecentlyViewedItem(item);
-			if (sanitized && !seen.has(sanitized.id)) {
-				seen.add(sanitized.id);
+		for (const rawItem of rawItems) {
+			const sanitized = sanitizeRecentlyViewedItem(rawItem);
+			if (sanitized && !seenIds.has(sanitized.id)) {
+				seenIds.add(sanitized.id);
 				items.push(sanitized);
 				if (items.length >= MAX_RECENTLY_VIEWED) break;
 			}
@@ -167,14 +177,18 @@ export class PersonalizationState {
 		if (typeof window === 'undefined') return;
 
 		try {
-			const viewedRaw = localStorage.getItem(RECENTLY_VIEWED_KEY);
+			const viewedRaw =
+				localStorage.getItem(RECENTLY_VIEWED_KEY) ||
+				localStorage.getItem(LEGACY_RECENTLY_VIEWED_KEY);
 			this.recentlyViewed = parseRecentlyViewed(viewedRaw);
 		} catch {
 			this.recentlyViewed = [];
 		}
 
 		try {
-			const searchRaw = localStorage.getItem(SEARCH_HISTORY_KEY);
+			const searchRaw =
+				localStorage.getItem(SEARCH_HISTORY_KEY) ||
+				localStorage.getItem(LEGACY_SEARCH_HISTORY_KEY);
 			this.searchHistory = parseSearchHistory(searchRaw);
 		} catch {
 			this.searchHistory = [];
@@ -191,9 +205,9 @@ export class PersonalizationState {
 	}
 
 	private handleStorageEvent = (event: StorageEvent) => {
-		if (event.key === RECENTLY_VIEWED_KEY) {
+		if (event.key === RECENTLY_VIEWED_KEY || event.key === LEGACY_RECENTLY_VIEWED_KEY) {
 			this.recentlyViewed = parseRecentlyViewed(event.newValue);
-		} else if (event.key === SEARCH_HISTORY_KEY) {
+		} else if (event.key === SEARCH_HISTORY_KEY || event.key === LEGACY_SEARCH_HISTORY_KEY) {
 			this.searchHistory = parseSearchHistory(event.newValue);
 		}
 	};

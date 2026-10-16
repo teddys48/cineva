@@ -1,4 +1,4 @@
-# Scenora
+# Cineva
 
 > **Find your next favorite.**
 > An editorial, cinematic movie discovery platform celebrating visual storytelling, curated cinema, and thoughtful film exploration.
@@ -86,8 +86,8 @@ Powered by SvelteKit, Svelte 5, Tailwind CSS, and the TMDB API v3.
 
 ```bash
 # Clone the repository
-git clone https://github.com/example/scenora.git
-cd scenora
+git clone https://github.com/example/cineva.git
+cd cineva
 
 # Install dependencies using Bun
 bun install
@@ -174,22 +174,22 @@ NODE_ENV=production bun run build
 
 ### Deployment Architecture
 
-In production, Scenora runs as a Node/Bun server behind a high-performance reverse proxy (Caddy or Nginx) that handles SSL/TLS termination, HTTP/2 or HTTP/3, and gzip/brotli compression.
+In production, Cineva runs as a Node/Bun server behind a high-performance reverse proxy (Caddy or Nginx) that handles SSL/TLS termination, HTTP/2 or HTTP/3, and gzip/brotli compression.
 
 #### A. Running with Systemd
 
-Create a systemd unit file at `/etc/systemd/system/scenora.service`:
+Create a systemd unit file at `/etc/systemd/system/cineva.service`:
 
 ```ini
 [Unit]
-Description=Scenora Movie Discovery Service
+Description=Cineva Movie Discovery Service
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/var/www/scenora
-EnvironmentFile=/var/www/scenora/.env
+WorkingDirectory=/var/www/cineva
+EnvironmentFile=/var/www/cineva/.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=HOST=127.0.0.1
@@ -205,8 +205,8 @@ Enable and start the service:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now scenora
-sudo systemctl status scenora
+sudo systemctl enable --now cineva
+sudo systemctl status cineva
 ```
 
 #### B. Reverse Proxy Configuration: Caddy
@@ -214,7 +214,7 @@ sudo systemctl status scenora
 Caddy provides automatic HTTPS with Let's Encrypt and HTTP/3 support:
 
 ```caddy
-scenora.example.com {
+cineva.example.com {
     # Reverse proxy upstream to local application
     reverse_proxy 127.0.0.1:3000 {
         header_up Host {host}
@@ -242,21 +242,21 @@ scenora.example.com {
 server {
     listen 80;
     listen [::]:80;
-    server_name scenora.example.com;
+    server_name cineva.example.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name scenora.example.com;
+    server_name cineva.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/scenora.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/scenora.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/cineva.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/cineva.example.com/privkey.pem;
 
     # Immutable client static asset caching
     location /_app/immutable/ {
-        alias /var/www/scenora/.svelte-kit/output/client/_app/immutable/;
+        alias /var/www/cineva/.svelte-kit/output/client/_app/immutable/;
         expires 1y;
         add_header Cache-Control "public, max-age=31536000, immutable";
         access_log off;

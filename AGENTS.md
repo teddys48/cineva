@@ -1,8 +1,8 @@
-# AGENT.md — Scenora
+# AGENT.md — Cineva
 
 ## 1. Project Overview
 
-Scenora is a cinematic movie discovery website powered by TMDB.
+Cineva is a cinematic movie discovery website powered by TMDB.
 
 Its purpose is to help users discover movies through trending collections, search, advanced filters, movie details, trailers, recommendations, and a personal watchlist.
 
@@ -15,7 +15,7 @@ Its purpose is to help users discover movies through trending collections, searc
 - Maintainable, type-safe code.
 - Incremental, verifiable implementation.
 
-Do not turn Scenora into a generic admin dashboard or an imitation of an existing streaming platform.
+Do not turn Cineva into a generic admin dashboard or an imitation of an existing streaming platform.
 
 ## 2. Technology Stack
 
@@ -59,7 +59,7 @@ If a skill cannot be located or loaded, report the limitation and continue using
 
 ## 4. Product Identity and Design Direction
 
-Product name: Scenora
+Product name: Cineva
 
 Product tagline: Find your next favorite.
 

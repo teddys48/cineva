@@ -113,7 +113,7 @@ describe('TMDB Utility Functions', () => {
 			genre_ids: [878, 28]
 		};
 
-		it('maps raw TMDB movie to Scenora Movie interface correctly', () => {
+		it('maps raw TMDB movie to Cineva Movie interface correctly', () => {
 			const movie = mapTMDBMovieToMovie(sampleTMDBMovie);
 
 			expect(movie.id).toBe('969681');

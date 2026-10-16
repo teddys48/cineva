@@ -5,7 +5,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta
 			name="description"
-			content="Scenora - An elegant, cinematic movie discovery experience. Find your next favorite."
+			content="Cineva - An elegant, cinematic movie discovery experience. Find your next favorite."
 		/>
 		<meta name="theme-color" content="#0B0D12" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,7 +18,7 @@
 			(function () {
 				try {
 					var stored =
-						localStorage.getItem('scenora-theme') || localStorage.getItem('cineva-theme');
+						localStorage.getItem('cineva-theme') || localStorage.getItem('scenora-theme');
 					var theme = stored;
 					if (!theme) {
 						var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
@@ -41,10 +41,7 @@
 		</script>
 		%sveltekit.head%
 	</head>
-	<body
-		data-sveltekit-preload-data="hover"
-		class="bg-cinema-bg text-cinema-text antialiased selection:bg-cinema-accent selection:text-cinema-accent-foreground"
-	>
+	<body data-sveltekit-preload-data="hover" class="bg-cinema-base text-cinema-text antialiased">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

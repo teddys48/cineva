@@ -23,17 +23,17 @@
 	let canonicalUrl = $derived(page.url.href);
 	let ogImage = $derived(data.featured?.backdropUrl || data.featured?.posterUrl || '');
 	const metaDescription =
-		'Discover cinematic masterpieces, trending releases, and upcoming premieres through an editorial film browsing experience on Scenora.';
+		'Discover cinematic masterpieces, trending releases, and upcoming premieres through an editorial film browsing experience on Cineva.';
 </script>
 
 <svelte:head>
-	<title>Scenora — Find your next favorite</title>
+	<title>Cineva — Find your next favorite</title>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
-	<meta property="og:title" content="Scenora — Find your next favorite" />
+	<meta property="og:site_name" content="Cineva" />
+	<meta property="og:title" content="Cineva — Find your next favorite" />
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={canonicalUrl} />
@@ -43,7 +43,7 @@
 
 	<!-- Twitter Cards -->
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="Scenora — Find your next favorite" />
+	<meta name="twitter:title" content="Cineva — Find your next favorite" />
 	<meta name="twitter:description" content={metaDescription} />
 	{#if ogImage}
 		<meta name="twitter:image" content={ogImage} />
@@ -69,7 +69,7 @@
 				<h1
 					class="font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-cinema-text sm:text-4xl"
 				>
-					Discover Cinema on Scenora
+					Discover Cinema on Cineva
 				</h1>
 				<p class="mt-3 text-sm leading-relaxed text-cinema-text-muted sm:text-base">
 					Curated film exploration celebrating storytelling, visionary direction, and visual craft.

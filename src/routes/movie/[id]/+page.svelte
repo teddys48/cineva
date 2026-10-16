@@ -93,15 +93,15 @@
 </script>
 
 <svelte:head>
-	<title>{movie.title} {movie.releaseYear ? `(${movie.releaseYear})` : ''} — Scenora</title>
+	<title>{movie.title} {movie.releaseYear ? `(${movie.releaseYear})` : ''} — Cineva</title>
 	<meta name="description" content={movie.overview} />
 	<link rel="canonical" href={canonicalUrl} />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
+	<meta property="og:site_name" content="Cineva" />
 	<meta
 		property="og:title"
-		content="{movie.title} {movie.releaseYear ? `(${movie.releaseYear})` : ''} — Scenora"
+		content="{movie.title} {movie.releaseYear ? `(${movie.releaseYear})` : ''} — Cineva"
 	/>
 	<meta property="og:description" content={movie.overview} />
 	<meta property="og:type" content="video.movie" />
@@ -114,7 +114,7 @@
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta
 		name="twitter:title"
-		content="{movie.title} {movie.releaseYear ? `(${movie.releaseYear})` : ''} — Scenora"
+		content="{movie.title} {movie.releaseYear ? `(${movie.releaseYear})` : ''} — Cineva"
 	/>
 	<meta name="twitter:description" content={movie.overview} />
 	{#if ogImage}

@@ -1,4 +1,4 @@
-# Scenora - Search Engine Crawler Directives
+# Cineva - Search Engine Crawler Directives
 User-agent: *
 Allow: /
 Disallow: /api/

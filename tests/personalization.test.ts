@@ -55,8 +55,8 @@ const sampleMovie2: Movie = {
 describe('Phase 5: Personalization & History Logic', () => {
 	describe('Storage Keys and Constants', () => {
 		it('uses correct namespaced storage keys', () => {
-			expect(RECENTLY_VIEWED_KEY).toBe('scenora:recently_viewed');
-			expect(SEARCH_HISTORY_KEY).toBe('scenora:search_history');
+			expect(RECENTLY_VIEWED_KEY).toBe('cineva:recently_viewed');
+			expect(SEARCH_HISTORY_KEY).toBe('cineva:search_history');
 		});
 	});
 

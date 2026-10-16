@@ -188,16 +188,16 @@
 	let canonicalUrl = $derived(page.url.href);
 	let metaDescription = $derived(
 		committedQuery
-			? `Search results for "${committedQuery}" across the TMDB catalog on Scenora.`
-			: 'Search cinema titles across the TMDB catalog with instant live search on Scenora.'
+			? `Search results for "${committedQuery}" across the TMDB catalog on Cineva.`
+			: 'Search cinema titles across the TMDB catalog with instant live search on Cineva.'
 	);
 </script>
 
 <svelte:head>
 	<title
 		>{committedQuery
-			? `"${committedQuery}" — Search Scenora`
-			: 'Search Scenora — Find your next favorite'}</title
+			? `"${committedQuery}" — Search Cineva`
+			: 'Search Cineva — Find your next favorite'}</title
 	>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
@@ -208,12 +208,12 @@
 	{/if}
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
+	<meta property="og:site_name" content="Cineva" />
 	<meta
 		property="og:title"
 		content={committedQuery
-			? `"${committedQuery}" — Search Scenora`
-			: 'Search Scenora — Find your next favorite'}
+			? `"${committedQuery}" — Search Cineva`
+			: 'Search Cineva — Find your next favorite'}
 	/>
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
@@ -224,8 +224,8 @@
 	<meta
 		name="twitter:title"
 		content={committedQuery
-			? `"${committedQuery}" — Search Scenora`
-			: 'Search Scenora — Find your next favorite'}
+			? `"${committedQuery}" — Search Cineva`
+			: 'Search Cineva — Find your next favorite'}
 	/>
 	<meta name="twitter:description" content={metaDescription} />
 </svelte:head>
@@ -242,7 +242,7 @@
 		<h1
 			class="mt-3 font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-cinema-text sm:text-4xl"
 		>
-			Search Scenora
+			Search Cineva
 		</h1>
 		<p class="mt-2 text-sm text-cinema-text-muted">
 			Find films by title across the official TMDB catalog with real-time matching.

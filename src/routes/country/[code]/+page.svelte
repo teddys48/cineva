@@ -19,7 +19,7 @@
 
 	let canonicalUrl = $derived(page.url.href);
 	let metaDescription = $derived(
-		`Discover acclaimed and trending films originating and produced in ${countryName} (ISO: ${countryCode}) on Scenora.`
+		`Discover acclaimed and trending films originating and produced in ${countryName} (ISO: ${countryCode}) on Cineva.`
 	);
 
 	function getPageUrl(p: number): string {
@@ -42,20 +42,20 @@
 </script>
 
 <svelte:head>
-	<title>Cinema of {countryName} — Film Discovery — Scenora</title>
+	<title>Cinema of {countryName} — Film Discovery — Cineva</title>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
-	<meta property="og:title" content="Cinema of {countryName} — Scenora" />
+	<meta property="og:site_name" content="Cineva" />
+	<meta property="og:title" content="Cinema of {countryName} — Cineva" />
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={canonicalUrl} />
 
 	<!-- Twitter Cards -->
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Cinema of {countryName} — Scenora" />
+	<meta name="twitter:title" content="Cinema of {countryName} — Cineva" />
 	<meta name="twitter:description" content={metaDescription} />
 </svelte:head>
 

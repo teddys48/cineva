@@ -54,7 +54,7 @@ describe('Phase 6: Quality, SEO, Accessibility, Security & Deployment Verificati
 
 	describe('Dynamic Sitemap XML Generation', () => {
 		it('generates valid XML sitemap with correct namespaces and content type', async () => {
-			const mockUrl = new URL('https://scenora.example.com/sitemap.xml');
+			const mockUrl = new URL('https://cineva.example.com/sitemap.xml');
 			const response = await getSitemap({
 				url: mockUrl,
 				params: {},
@@ -68,12 +68,12 @@ describe('Phase 6: Quality, SEO, Accessibility, Security & Deployment Verificati
 			const xmlText = await response.text();
 			expect(xmlText.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
 			expect(xmlText).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
-			expect(xmlText).toContain('<loc>https://scenora.example.com</loc>');
-			expect(xmlText).toContain('<loc>https://scenora.example.com/explore</loc>');
+			expect(xmlText).toContain('<loc>https://cineva.example.com</loc>');
+			expect(xmlText).toContain('<loc>https://cineva.example.com/explore</loc>');
 
 			// Contains TMDB genre canonical discovery paths
-			expect(xmlText).toContain('<loc>https://scenora.example.com/explore?genre=28</loc>'); // Action
-			expect(xmlText).toContain('<loc>https://scenora.example.com/explore?genre=878</loc>'); // Sci-Fi
+			expect(xmlText).toContain('<loc>https://cineva.example.com/explore?genre=28</loc>'); // Action
+			expect(xmlText).toContain('<loc>https://cineva.example.com/explore?genre=878</loc>'); // Sci-Fi
 			expect(xmlText).toContain('</urlset>');
 		});
 
@@ -97,7 +97,7 @@ describe('Phase 6: Quality, SEO, Accessibility, Security & Deployment Verificati
 
 	describe('Search Endpoint Error Handling and API Boundaries', () => {
 		it('returns empty result array when search query is empty string', async () => {
-			const mockUrl = new URL('https://scenora.example.com/api/search?query=');
+			const mockUrl = new URL('https://cineva.example.com/api/search?query=');
 			const response = await getSearchApi({
 				url: mockUrl,
 				fetch: globalThis.fetch
@@ -110,7 +110,7 @@ describe('Phase 6: Quality, SEO, Accessibility, Security & Deployment Verificati
 		});
 
 		it('handles search server errors without leaking raw exception details', async () => {
-			const mockUrl = new URL('https://scenora.example.com/api/search?query=ErrorTrigger');
+			const mockUrl = new URL('https://cineva.example.com/api/search?query=ErrorTrigger');
 			const failingFetch: typeof fetch = async () => {
 				return new Response(JSON.stringify({ status_message: 'Invalid API key or token' }), {
 					status: 401

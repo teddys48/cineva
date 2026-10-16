@@ -127,27 +127,27 @@
 	let canonicalUrl = $derived(page.url.href);
 	let metaDescription = $derived(
 		currentGenreName
-			? `Explore curated ${currentGenreName} movies, release eras, and ratings powered by TMDB on Scenora.`
-			: 'Explore curated cinema across genres, release eras, and ratings powered by TMDB on Scenora.'
+			? `Explore curated ${currentGenreName} movies, release eras, and ratings powered by TMDB on Cineva.`
+			: 'Explore curated cinema across genres, release eras, and ratings powered by TMDB on Cineva.'
 	);
 </script>
 
 <svelte:head>
 	<title
 		>{currentGenreName
-			? `${currentGenreName} Movies — Explore Scenora`
-			: 'Explore Cinema — Scenora'}</title
+			? `${currentGenreName} Movies — Explore Cineva`
+			: 'Explore Cinema — Cineva'}</title
 	>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
+	<meta property="og:site_name" content="Cineva" />
 	<meta
 		property="og:title"
 		content={currentGenreName
-			? `${currentGenreName} Movies — Explore Scenora`
-			: 'Explore Cinema — Scenora'}
+			? `${currentGenreName} Movies — Explore Cineva`
+			: 'Explore Cinema — Cineva'}
 	/>
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
@@ -158,8 +158,8 @@
 	<meta
 		name="twitter:title"
 		content={currentGenreName
-			? `${currentGenreName} Movies — Explore Scenora`
-			: 'Explore Cinema — Scenora'}
+			? `${currentGenreName} Movies — Explore Cineva`
+			: 'Explore Cinema — Cineva'}
 	/>
 	<meta name="twitter:description" content={metaDescription} />
 </svelte:head>

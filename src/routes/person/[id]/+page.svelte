@@ -147,18 +147,18 @@
 	let metaDescription = $derived(
 		person.biography
 			? person.biography.slice(0, 160).trim()
-			: `Explore ${person.name}'s filmography, career credits, and profile on Scenora.`
+			: `Explore ${person.name}'s filmography, career credits, and profile on Cineva.`
 	);
 </script>
 
 <svelte:head>
-	<title>{person.name} — Profile & Filmography — Scenora</title>
+	<title>{person.name} — Profile & Filmography — Cineva</title>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
-	<meta property="og:title" content="{person.name} — Profile & Filmography — Scenora" />
+	<meta property="og:site_name" content="Cineva" />
+	<meta property="og:title" content="{person.name} — Profile & Filmography — Cineva" />
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="profile" />
 	<meta property="og:url" content={canonicalUrl} />
@@ -168,7 +168,7 @@
 
 	<!-- Twitter Cards -->
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content="{person.name} — Profile & Filmography — Scenora" />
+	<meta name="twitter:title" content="{person.name} — Profile & Filmography — Cineva" />
 	<meta name="twitter:description" content={metaDescription} />
 	{#if person.profileUrl}
 		<meta name="twitter:image" content={person.profileUrl} />

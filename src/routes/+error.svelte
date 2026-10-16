@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>{status} — Scenora</title>
+	<title>{status} — Cineva</title>
 </svelte:head>
 
 <div class="flex min-h-[65vh] flex-col items-center justify-center px-4 py-16 text-center">

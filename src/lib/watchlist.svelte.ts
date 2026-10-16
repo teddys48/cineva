@@ -8,7 +8,8 @@ import type {
 	ToastMessage
 } from './types/watchlist';
 
-export const WATCHLIST_STORAGE_KEY = 'scenora:watchlist';
+export const WATCHLIST_STORAGE_KEY = 'cineva:watchlist';
+export const LEGACY_WATCHLIST_STORAGE_KEY = 'scenora:watchlist';
 export const CURRENT_SCHEMA_VERSION = 1;
 
 /**
@@ -167,7 +168,9 @@ export class WatchlistState {
 		if (typeof window === 'undefined') return;
 
 		try {
-			const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+			const raw =
+				localStorage.getItem(WATCHLIST_STORAGE_KEY) ||
+				localStorage.getItem(LEGACY_WATCHLIST_STORAGE_KEY);
 			this.items = parseWatchlistStorage(raw);
 			this.storageAvailable = true;
 		} catch {
@@ -191,7 +194,7 @@ export class WatchlistState {
 	}
 
 	private handleStorageEvent = (event: StorageEvent) => {
-		if (event.key === WATCHLIST_STORAGE_KEY) {
+		if (event.key === WATCHLIST_STORAGE_KEY || event.key === LEGACY_WATCHLIST_STORAGE_KEY) {
 			this.items = parseWatchlistStorage(event.newValue);
 		}
 	};
@@ -229,14 +232,19 @@ export class WatchlistState {
 			const targetId = String(movie.id);
 
 			if (this.has(targetId)) {
-				return true; // Already saved, duplicate prevented
+				this.showToast({
+					id: String(Date.now()),
+					message: `"${movie.title}" is already in your watchlist`,
+					type: 'info',
+					movieTitle: movie.title
+				});
+				return false;
 			}
 
 			const newItem = movieToWatchlistItem(movie);
-			// Prepend so newly added items show first
 			this.items = [newItem, ...this.items];
-
 			const persisted = this.persist();
+
 			if (persisted) {
 				this.showToast({
 					id: String(Date.now()),
@@ -271,25 +279,29 @@ export class WatchlistState {
 	}
 
 	toggle(movie: Movie | MovieDetail): boolean {
-		const targetId = String(movie.id);
-		if (this.has(targetId)) {
-			return this.remove(targetId);
+		if (this.has(movie.id)) {
+			this.remove(movie.id);
+			return false;
 		} else {
-			return this.add(movie);
+			this.add(movie);
+			return true;
 		}
 	}
 
 	clear(): boolean {
-		this.items = [];
-		const persisted = this.persist();
-		if (persisted) {
-			this.showToast({
-				id: String(Date.now()),
-				message: 'Watchlist cleared',
-				type: 'info'
-			});
-		}
-		return persisted;
+		return untrack(() => {
+			if (this.items.length === 0) return true;
+			this.items = [];
+			const persisted = this.persist();
+			if (persisted) {
+				this.showToast({
+					id: String(Date.now()),
+					message: 'Watchlist cleared successfully',
+					type: 'info'
+				});
+			}
+			return persisted;
+		});
 	}
 
 	get count(): number {

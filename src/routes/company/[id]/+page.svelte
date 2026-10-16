@@ -21,7 +21,7 @@
 	let metaDescription = $derived(
 		company.description
 			? company.description.slice(0, 160).trim()
-			: `Discover movies produced by ${company.name} on Scenora.`
+			: `Discover movies produced by ${company.name} on Cineva.`
 	);
 
 	function getPageUrl(p: number): string {
@@ -32,13 +32,13 @@
 </script>
 
 <svelte:head>
-	<title>{company.name} — Production Company — Scenora</title>
+	<title>{company.name} — Production Company — Cineva</title>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
 
 	<!-- Open Graph / Social Sharing -->
-	<meta property="og:site_name" content="Scenora" />
-	<meta property="og:title" content="{company.name} — Production Company — Scenora" />
+	<meta property="og:site_name" content="Cineva" />
+	<meta property="og:title" content="{company.name} — Production Company — Cineva" />
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={canonicalUrl} />
@@ -48,7 +48,7 @@
 
 	<!-- Twitter Cards -->
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="{company.name} — Production Company — Scenora" />
+	<meta name="twitter:title" content="{company.name} — Production Company — Cineva" />
 	<meta name="twitter:description" content={metaDescription} />
 	{#if company.logoUrl}
 		<meta name="twitter:image" content={company.logoUrl} />

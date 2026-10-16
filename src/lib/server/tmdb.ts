@@ -366,7 +366,7 @@ export function parseReleaseDate(dateStr?: string | null): {
 }
 
 /**
- * Transform a raw TMDB movie object into Scenora's Movie model
+ * Transform a raw TMDB movie object into Cineva's Movie model
  */
 export function mapTMDBMovieToMovie(
 	tmdbMovie: TMDBMovie,
@@ -419,7 +419,7 @@ export function mapTMDBMovieToMovie(
 }
 
 /**
- * Transform raw TMDB details, credits, and videos into Scenora's MovieDetail model
+ * Transform raw TMDB details, credits, and videos into Cineva's MovieDetail model
  */
 export function mapTMDBMovieDetailsToDetail(
 	details: TMDBMovieDetails,
@@ -1120,7 +1120,7 @@ export function formatPersonDate(dateStr?: string | null): string | undefined {
 }
 
 /**
- * Transform raw TMDB person and movie credits into Scenora's PersonProfile model
+ * Transform raw TMDB person and movie credits into Cineva's PersonProfile model
  */
 export function mapTMDBPersonToProfile(
 	rawPerson: TMDBPerson,

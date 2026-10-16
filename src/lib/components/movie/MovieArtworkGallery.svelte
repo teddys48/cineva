@@ -3,7 +3,7 @@
 	import ArtworkLightbox from '#lib/components/movie/ArtworkLightbox.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
-	import { Images, Maximize2, Image as ImageIcon } from 'lucide-svelte';
+	import { Images, Maximize2, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-svelte';
 
 	interface Props {
 		gallery: MovieImagesGallery;
@@ -14,6 +14,17 @@
 
 	type GalleryTab = 'all' | 'posters' | 'backdrops' | 'logos';
 	let activeTab = $state<GalleryTab>('all');
+
+	// Initial limit for artwork items before clicking "Show More"
+	const ARTWORK_LIMIT = 6;
+
+	// Show more / less state for each section in 'all' tab
+	let showAllBackdrops = $state(false);
+	let showAllPosters = $state(false);
+	let showAllLogos = $state(false);
+
+	// Show more / less state for individual category tabs
+	let showAllCategory = $state(false);
 
 	// Lightbox State
 	let lightboxOpen = $state(false);
@@ -37,6 +48,34 @@
 		if (activeTab === 'logos') return gallery.logos;
 		return gallery.all;
 	});
+
+	let visibleBackdrops = $derived(
+		showAllBackdrops ? gallery.backdrops : gallery.backdrops.slice(0, ARTWORK_LIMIT)
+	);
+
+	let visiblePosters = $derived(
+		showAllPosters ? gallery.posters : gallery.posters.slice(0, ARTWORK_LIMIT)
+	);
+
+	let visibleLogos = $derived(
+		showAllLogos ? gallery.logos : gallery.logos.slice(0, ARTWORK_LIMIT)
+	);
+
+	let visibleActiveItems = $derived(
+		showAllCategory ? activeItems : activeItems.slice(0, ARTWORK_LIMIT)
+	);
+
+	let activeCategoryLabel = $derived.by(() => {
+		if (activeTab === 'posters') return 'Posters';
+		if (activeTab === 'backdrops') return 'Wallpapers';
+		if (activeTab === 'logos') return 'Logos';
+		return 'Artwork';
+	});
+
+	function selectTab(tab: GalleryTab) {
+		activeTab = tab;
+		showAllCategory = false;
+	}
 
 	function openLightbox(image: MovieImage, collection: MovieImage[]) {
 		const idx = collection.findIndex((item) => item.id === image.id);
@@ -66,7 +105,7 @@
 		if (nextIndex >= 0) {
 			event.preventDefault();
 			const nextTab = categories[nextIndex].id;
-			activeTab = nextTab;
+			selectTab(nextTab);
 			const targetEl = document.getElementById(`gallery-tab-${nextTab}`);
 			targetEl?.focus();
 		}
@@ -111,7 +150,7 @@
 						aria-selected={activeTab === category.id}
 						aria-controls="gallery-tabpanel"
 						tabindex={activeTab === category.id ? 0 : -1}
-						onclick={() => (activeTab = category.id)}
+						onclick={() => selectTab(category.id)}
 						onkeydown={(e) => handleTabKeyDown(e, idx)}
 						class="flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none {activeTab ===
 						category.id
@@ -167,7 +206,7 @@
 				</p>
 				<button
 					type="button"
-					onclick={() => (activeTab = 'all')}
+					onclick={() => selectTab('all')}
 					class="mt-4 rounded-xl border border-cinema-border bg-cinema-surface px-4 py-2 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
 				>
 					View All Artwork ({gallery.totalCount})
@@ -188,7 +227,7 @@
 							</h3>
 							<button
 								type="button"
-								onclick={() => (activeTab = 'backdrops')}
+								onclick={() => selectTab('backdrops')}
 								class="text-xs font-medium text-cinema-accent transition-colors hover:underline"
 							>
 								Filter Backdrops Only
@@ -196,7 +235,7 @@
 						</div>
 
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-							{#each gallery.backdrops as backdrop (backdrop.id)}
+							{#each visibleBackdrops as backdrop (backdrop.id)}
 								<button
 									type="button"
 									onclick={() => openLightbox(backdrop, gallery.backdrops)}
@@ -254,6 +293,27 @@
 								</button>
 							{/each}
 						</div>
+
+						{#if gallery.backdrops.length > ARTWORK_LIMIT}
+							<div class="mt-8 flex justify-center">
+								<button
+									type="button"
+									onclick={() => (showAllBackdrops = !showAllBackdrops)}
+									class="inline-flex items-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 py-2.5 text-xs font-semibold text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+								>
+									<span>
+										{showAllBackdrops
+											? 'Show Less Wallpapers'
+											: `Show More Wallpapers (${gallery.backdrops.length})`}
+									</span>
+									{#if showAllBackdrops}
+										<ChevronUp class="h-3.5 w-3.5 text-cinema-accent" />
+									{:else}
+										<ChevronDown class="h-3.5 w-3.5 text-cinema-accent" />
+									{/if}
+								</button>
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -269,7 +329,7 @@
 							</h3>
 							<button
 								type="button"
-								onclick={() => (activeTab = 'posters')}
+								onclick={() => selectTab('posters')}
 								class="text-xs font-medium text-cinema-accent transition-colors hover:underline"
 							>
 								Filter Posters Only
@@ -277,9 +337,9 @@
 						</div>
 
 						<div
-							class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5"
+							class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6"
 						>
-							{#each gallery.posters as poster (poster.id)}
+							{#each visiblePosters as poster (poster.id)}
 								<button
 									type="button"
 									onclick={() => openLightbox(poster, gallery.posters)}
@@ -337,6 +397,27 @@
 								</button>
 							{/each}
 						</div>
+
+						{#if gallery.posters.length > ARTWORK_LIMIT}
+							<div class="mt-8 flex justify-center">
+								<button
+									type="button"
+									onclick={() => (showAllPosters = !showAllPosters)}
+									class="inline-flex items-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 py-2.5 text-xs font-semibold text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+								>
+									<span>
+										{showAllPosters
+											? 'Show Less Posters'
+											: `Show More Posters (${gallery.posters.length})`}
+									</span>
+									{#if showAllPosters}
+										<ChevronUp class="h-3.5 w-3.5 text-cinema-accent" />
+									{:else}
+										<ChevronDown class="h-3.5 w-3.5 text-cinema-accent" />
+									{/if}
+								</button>
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -352,15 +433,17 @@
 							</h3>
 							<button
 								type="button"
-								onclick={() => (activeTab = 'logos')}
+								onclick={() => selectTab('logos')}
 								class="text-xs font-medium text-cinema-accent transition-colors hover:underline"
 							>
 								Filter Logos Only
 							</button>
 						</div>
 
-						<div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
-							{#each gallery.logos as logo (logo.id)}
+						<div
+							class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6"
+						>
+							{#each visibleLogos as logo (logo.id)}
 								<button
 									type="button"
 									onclick={() => openLightbox(logo, gallery.logos)}
@@ -410,6 +493,27 @@
 								</button>
 							{/each}
 						</div>
+
+						{#if gallery.logos.length > ARTWORK_LIMIT}
+							<div class="mt-8 flex justify-center">
+								<button
+									type="button"
+									onclick={() => (showAllLogos = !showAllLogos)}
+									class="inline-flex items-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 py-2.5 text-xs font-semibold text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+								>
+									<span>
+										{showAllLogos
+											? 'Show Less Logos'
+											: `Show More Logos (${gallery.logos.length})`}
+									</span>
+									{#if showAllLogos}
+										<ChevronUp class="h-3.5 w-3.5 text-cinema-accent" />
+									{:else}
+										<ChevronDown class="h-3.5 w-3.5 text-cinema-accent" />
+									{/if}
+								</button>
+							</div>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -418,12 +522,12 @@
 		{:else}
 			<div
 				class={activeTab === 'posters'
-					? 'grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5'
+					? 'grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6'
 					: activeTab === 'backdrops'
 						? 'grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3'
-						: 'grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4'}
+						: 'grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6'}
 			>
-				{#each activeItems as item (item.id)}
+				{#each visibleActiveItems as item (item.id)}
 					<button
 						type="button"
 						onclick={() => openLightbox(item, activeItems)}
@@ -489,6 +593,27 @@
 					</button>
 				{/each}
 			</div>
+
+			{#if activeItems.length > ARTWORK_LIMIT}
+				<div class="mt-8 flex justify-center">
+					<button
+						type="button"
+						onclick={() => (showAllCategory = !showAllCategory)}
+						class="inline-flex items-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 py-2.5 text-xs font-semibold text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
+					>
+						<span>
+							{showAllCategory
+								? `Show Less ${activeCategoryLabel}`
+								: `Show More ${activeCategoryLabel} (${activeItems.length})`}
+						</span>
+						{#if showAllCategory}
+							<ChevronUp class="h-3.5 w-3.5 text-cinema-accent" />
+						{:else}
+							<ChevronDown class="h-3.5 w-3.5 text-cinema-accent" />
+						{/if}
+					</button>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
