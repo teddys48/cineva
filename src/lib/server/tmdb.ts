@@ -356,7 +356,10 @@ export function mapTMDBMovieToMovie(
 
 	// Format rating: null if no votes or 0 rating
 	const rating =
-		tmdbMovie.vote_count > 0 && tmdbMovie.vote_average > 0
+		typeof tmdbMovie.vote_average === 'number' &&
+		!Number.isNaN(tmdbMovie.vote_average) &&
+		tmdbMovie.vote_count > 0 &&
+		tmdbMovie.vote_average > 0
 			? Number(tmdbMovie.vote_average.toFixed(1))
 			: null;
 

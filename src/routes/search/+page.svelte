@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { Movie } from '#lib/types/movie';
@@ -8,7 +8,8 @@
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
 	import Pagination from '#lib/components/ui/Pagination.svelte';
-	import { Search, X, Clapperboard, Loader2 } from 'lucide-svelte';
+	import { personalizationState } from '#lib/personalization.svelte';
+	import { Search, X, Clapperboard, Loader2, History } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -34,6 +35,8 @@
 		'Animation'
 	];
 
+	let recentQueries = $derived(personalizationState.searchHistory);
+
 	// Sync when server data changes (e.g. browser back/forward or direct navigation)
 	$effect(() => {
 		queryInput = data.query || '';
@@ -43,6 +46,13 @@
 		totalPages = data.totalPages || 0;
 		totalResults = data.totalResults || 0;
 		searchError = data.error || null;
+
+		const searchQuery = data.query?.trim();
+		if (searchQuery && searchQuery.length >= 2 && typeof window !== 'undefined') {
+			untrack(() => {
+				personalizationState.addSearchQuery(searchQuery);
+			});
+		}
 	});
 
 	onDestroy(() => {
@@ -98,6 +108,11 @@
 			totalResults = json.totalResults || 0;
 			committedQuery = trimmed;
 			currentPage = page;
+
+			// Record in search history only on successful search
+			if (typeof window !== 'undefined') {
+				personalizationState.addSearchQuery(trimmed);
+			}
 
 			// Sync URL state without triggering an unnecessary full navigation
 			const targetUrl =
@@ -158,6 +173,11 @@
 	function handleSuggestionClick(term: string) {
 		queryInput = term;
 		executeSearch(term, 1, false);
+	}
+
+	function handleRemoveRecent(e: MouseEvent, term: string) {
+		e.stopPropagation();
+		personalizationState.removeSearchQuery(term);
 	}
 
 	function handlePageSelect(targetPage: number) {
@@ -238,8 +258,48 @@
 			{/if}
 		</form>
 
+		<!-- Recent Searches Section (Lightweight Personalization) -->
+		{#if recentQueries.length > 0}
+			<div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+				<div class="flex items-center gap-1 text-cinema-text-muted">
+					<History class="h-3.5 w-3.5 text-cinema-accent" />
+					<span>Recent:</span>
+				</div>
+				{#each recentQueries as recent (recent)}
+					<div
+						class="inline-flex items-center gap-1 rounded-md border border-cinema-border bg-cinema-surface py-0.5 pr-1 pl-2 text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated"
+					>
+						<button
+							type="button"
+							onclick={() => handleSuggestionClick(recent)}
+							class="text-xs font-medium text-cinema-text hover:text-cinema-accent focus-visible:outline-none"
+						>
+							{recent}
+						</button>
+						<button
+							type="button"
+							onclick={(e) => handleRemoveRecent(e, recent)}
+							class="flex h-4 w-4 items-center justify-center rounded text-cinema-text-muted hover:text-cinema-text focus-visible:outline-none"
+							aria-label="Remove '{recent}' from search history"
+							title="Remove from history"
+						>
+							<X class="h-3 w-3" />
+						</button>
+					</div>
+				{/each}
+				<button
+					type="button"
+					onclick={() => personalizationState.clearSearchHistory()}
+					class="ml-1 text-[11px] text-cinema-text-muted transition-colors hover:text-red-400 focus-visible:outline-none"
+					title="Clear all recent searches"
+				>
+					Clear
+				</button>
+			</div>
+		{/if}
+
 		<!-- Suggested Queries -->
-		<div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+		<div class="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
 			<span class="text-cinema-text-muted">Popular searches:</span>
 			{#each suggestedQueries as suggestion (suggestion)}
 				<button
@@ -263,78 +323,80 @@
 			/>
 		{:else if isLoading && movies.length === 0}
 			<!-- Loading Skeleton State when no results currently exist -->
-			<div class="mb-6 flex items-center justify-between border-b border-cinema-border pb-4">
-				<span class="text-xs text-cinema-text-muted">Searching TMDB database...</span>
-			</div>
-			<div
-				class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-5"
-				aria-busy="true"
-				aria-live="polite"
-			>
-				{#each Array.from({ length: 10 }, (_, idx) => idx) as idx (idx)}
+			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-5">
+				{#each [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as skeletonId (skeletonId)}
 					<MovieCardSkeleton />
 				{/each}
 			</div>
-		{:else if committedQuery.trim() !== ''}
-			<div class="mb-6 flex items-center justify-between border-b border-cinema-border pb-4">
-				<h2 class="font-['Space_Grotesk'] text-lg font-semibold text-cinema-text">
-					Results for "{committedQuery}"
-				</h2>
-				<span class="text-xs text-cinema-text-muted">
-					{#if totalResults > 0}
-						Showing page <span class="font-mono text-cinema-text">{currentPage}</span> of
-						<span class="font-mono text-cinema-text">{Math.min(500, totalPages)}</span>
-						({totalResults.toLocaleString()}
-						{totalResults === 1 ? 'title' : 'titles'} found)
-					{:else}
-						0 titles found
-					{/if}
-				</span>
-			</div>
-
-			{#if movies.length > 0}
-				<div class="relative">
-					{#if isLoading}
-						<div
-							class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-cinema-bg/60 backdrop-blur-xs"
-							aria-busy="true"
+		{:else if committedQuery && movies.length === 0 && !isLoading}
+			<!-- Empty Results State -->
+			<EmptyState
+				icon={Clapperboard}
+				title={`No movies found for "${committedQuery}"`}
+				description="We couldn't locate any matching titles in the TMDB catalog. Check your spelling or try another cinematic search term."
+				actionHref="/explore"
+				actionLabel="Explore All Movies"
+			/>
+		{:else if movies.length > 0}
+			<!-- Active Search Results Header -->
+			<div
+				class="mb-6 flex flex-col gap-2 border-b border-cinema-border/50 pb-4 sm:flex-row sm:items-center sm:justify-between"
+			>
+				<div>
+					<p class="text-xs font-medium text-cinema-text-muted">
+						Showing results for <span class="font-semibold text-cinema-text"
+							>"{committedQuery}"</span
 						>
-							<div
-								class="flex items-center gap-2 rounded-lg border border-cinema-border bg-cinema-surface px-4 py-2 text-xs font-medium text-cinema-text shadow-lg"
-							>
-								<Loader2 class="h-4 w-4 animate-spin text-cinema-accent" />
-								<span>Updating results...</span>
-							</div>
-						</div>
+					</p>
+					{#if totalResults > 0}
+						<p class="mt-0.5 text-xs text-cinema-text-muted">
+							Found {new Intl.NumberFormat('en-US').format(totalResults)} matching film{totalResults ===
+							1
+								? ''
+								: 's'}
+						</p>
 					{/if}
-					<MovieGrid {movies} />
 				</div>
 
-				<!-- Pagination Controls -->
-				<Pagination
-					{currentPage}
-					{totalPages}
-					getPageUrl={getSearchPageUrl}
-					onPageSelect={handlePageSelect}
-				/>
-			{:else}
-				<EmptyState
-					title="No Matching Films"
-					description="We couldn't find any films matching &quot;{committedQuery}&quot;. Check the spelling, try broader keywords, or browse through our curated catalog."
-					actionHref="/explore"
-					actionLabel="Explore All Genres"
-				/>
+				{#if totalPages > 1}
+					<div class="text-xs text-cinema-text-muted">
+						Page <span class="font-semibold text-cinema-text">{currentPage}</span> of
+						<span class="font-semibold text-cinema-text">{totalPages}</span>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Search Results Grid -->
+			<MovieGrid {movies} />
+
+			<!-- Pagination Controls -->
+			{#if totalPages > 1}
+				<div class="mt-12">
+					<Pagination
+						{currentPage}
+						{totalPages}
+						getPageUrl={getSearchPageUrl}
+						onPageSelect={handlePageSelect}
+					/>
+				</div>
 			{/if}
 		{:else}
-			<!-- Idle / Search Initiation Prompt -->
-			<div class="mx-auto max-w-xl">
-				<EmptyState
-					icon={Clapperboard}
-					title="Discover Cinema"
-					description="Search across thousands of titles in TMDB. Enter a movie title or choose one of the popular recommendations above."
-					actionHref="/explore"
-					actionLabel="Browse Curated Explore"
-				/>
+			<!-- Initial Search Idle State -->
+			<div
+				class="flex flex-col items-center justify-center rounded-2xl border border-cinema-border/50 bg-cinema-surface/30 p-12 text-center"
+			>
+				<div
+					class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cinema-border bg-cinema-elevated text-cinema-accent"
+				>
+					<Search class="h-7 w-7" />
+				</div>
+				<h2 class="font-['Space_Grotesk'] text-lg font-bold text-cinema-text sm:text-xl">
+					Type to Search the Catalog
+				</h2>
+				<p class="mt-2 max-w-md text-xs leading-relaxed text-cinema-text-muted sm:text-sm">
+					Search over 700,000 films by title, franchise, or keyword. Results update in real-time as
+					you type.
+				</p>
 			</div>
 		{/if}
 	</div>

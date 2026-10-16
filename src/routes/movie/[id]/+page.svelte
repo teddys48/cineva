@@ -1,23 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import type { PageProps } from './$types';
 	import MovieCard from '#lib/components/movie/MovieCard.svelte';
 	import MovieCast from '#lib/components/movie/MovieCast.svelte';
 	import MovieInfo from '#lib/components/movie/MovieInfo.svelte';
 	import TrailerModal from '#lib/components/movie/TrailerModal.svelte';
+	import WatchlistButton from '#lib/components/movie/WatchlistButton.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
-	import {
-		Star,
-		Play,
-		Share2,
-		ArrowLeft,
-		Bookmark,
-		Check,
-		Film,
-		Info,
-		Sparkles
-	} from 'lucide-svelte';
+	import { personalizationState } from '#lib/personalization.svelte';
+	import { Star, Play, Share2, ArrowLeft, Film, Info, Sparkles } from 'lucide-svelte';
 
 	let { data }: PageProps = $props();
 	let movie = $derived(data.movie);
@@ -27,9 +20,18 @@
 	// State
 	let trailerModalOpen = $state(false);
 	let copiedLink = $state(false);
-	let inWatchlist = $state(false);
 	let backdropError = $state(false);
 	let posterError = $state(false);
+
+	// Record recently viewed movie on client mount
+	$effect(() => {
+		const currentMovie = movie;
+		if (currentMovie && typeof window !== 'undefined') {
+			untrack(() => {
+				personalizationState.addRecentlyViewed(currentMovie);
+			});
+		}
+	});
 
 	function openTrailer() {
 		if (movie.trailer) {
@@ -39,10 +41,6 @@
 
 	function closeTrailer() {
 		trailerModalOpen = false;
-	}
-
-	function toggleWatchlist() {
-		inWatchlist = !inWatchlist;
 	}
 
 	function shareMovie() {
@@ -65,7 +63,9 @@
 	let canonicalUrl = $derived(page.url.href);
 	let ogImage = $derived(movie.backdropUrl || movie.posterUrl || '');
 	let formattedRating = $derived(
-		movie.rating != null && movie.rating > 0 ? movie.rating.toFixed(1) : null
+		typeof movie.rating === 'number' && !Number.isNaN(movie.rating) && movie.rating > 0
+			? movie.rating.toFixed(1)
+			: null
 	);
 	let formattedVotes = $derived(
 		movie.voteCount && movie.voteCount > 0
@@ -279,19 +279,7 @@
 							<span>Film Facts</span>
 						</button>
 
-						<button
-							type="button"
-							onclick={toggleWatchlist}
-							class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 text-sm font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
-						>
-							{#if inWatchlist}
-								<Check class="h-4 w-4 text-cinema-accent" />
-								<span>In Watchlist</span>
-							{:else}
-								<Bookmark class="h-4 w-4 text-cinema-text-muted" />
-								<span>Add to Watchlist</span>
-							{/if}
-						</button>
+						<WatchlistButton {movie} variant="button" />
 
 						<button
 							type="button"

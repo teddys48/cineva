@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { Film, Compass, Bookmark, Search, Menu, X } from 'lucide-svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
+	import { watchlistState } from '#lib/watchlist.svelte';
 
 	let isMobileMenuOpen = $state(false);
 
@@ -54,6 +55,13 @@
 				>
 					<Icon class="h-4 w-4 {isActive ? 'text-cinema-accent' : 'text-cinema-text-muted'}" />
 					<span>{item.label}</span>
+					{#if item.href === '/watchlist' && watchlistState.count > 0}
+						<span
+							class="flex h-4 min-w-4 items-center justify-center rounded-full bg-cinema-accent px-1 font-mono text-[10px] font-bold text-cinema-accent-foreground"
+						>
+							{watchlistState.count}
+						</span>
+					{/if}
 					{#if isActive}
 						<span class="absolute right-3 bottom-0 left-3 h-0.5 rounded-full bg-cinema-accent"
 						></span>
@@ -109,12 +117,21 @@
 					<a
 						href={item.href}
 						onclick={closeMenu}
-						class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors {isActive
+						class="flex items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors {isActive
 							? 'bg-cinema-surface text-cinema-accent'
 							: 'text-cinema-text-muted hover:bg-cinema-surface hover:text-cinema-text'}"
 					>
-						<Icon class="h-5 w-5" />
-						<span>{item.label}</span>
+						<div class="flex items-center gap-3">
+							<Icon class="h-5 w-5" />
+							<span>{item.label}</span>
+						</div>
+						{#if item.href === '/watchlist' && watchlistState.count > 0}
+							<span
+								class="flex h-5 min-w-5 items-center justify-center rounded-full bg-cinema-accent px-1.5 font-mono text-xs font-bold text-cinema-accent-foreground"
+							>
+								{watchlistState.count}
+							</span>
+						{/if}
 					</a>
 				{/each}
 			</nav>

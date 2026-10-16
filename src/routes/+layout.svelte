@@ -3,6 +3,7 @@
 	import type { LayoutProps } from './$types';
 	import Navbar from '#lib/components/layout/Navbar.svelte';
 	import Footer from '#lib/components/layout/Footer.svelte';
+	import Toast from '#lib/components/ui/Toast.svelte';
 
 	let { children }: LayoutProps = $props();
 </script>
@@ -19,4 +20,5 @@
 		{@render children()}
 	</main>
 	<Footer />
+	<Toast />
 </div>

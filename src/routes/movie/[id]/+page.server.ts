@@ -52,7 +52,10 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 
 	const rawDetails = detailsResult.value;
 	const creditsData = creditsResult.status === 'fulfilled' ? creditsResult.value : null;
-	const videosData = videosResult.status === 'fulfilled' ? videosResult.value.results : null;
+	const videosData =
+		videosResult.status === 'fulfilled' && videosResult.value?.results
+			? videosResult.value.results
+			: null;
 
 	const movieDetail = mapTMDBMovieDetailsToDetail(rawDetails, creditsData, videosData);
 
@@ -60,9 +63,9 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	let similarMovies: Movie[] = [];
 	let similarError: string | null = null;
 	if (similarResult.status === 'fulfilled') {
-		const rawSimilar = similarResult.value.results || [];
+		const rawSimilar = similarResult.value?.results || [];
 		similarMovies = rawSimilar
-			.filter((m) => String(m.id) !== String(movieId))
+			.filter((m) => m && String(m.id) !== String(movieId))
 			.map((m) => mapTMDBMovieToMovie(m))
 			.slice(0, 8);
 	} else {
@@ -73,9 +76,9 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	let recommendationsMovies: Movie[] = [];
 	let recommendationsError: string | null = null;
 	if (recommendationsResult.status === 'fulfilled') {
-		const rawRecs = recommendationsResult.value.results || [];
+		const rawRecs = recommendationsResult.value?.results || [];
 		const allRecs = rawRecs
-			.filter((m) => String(m.id) !== String(movieId))
+			.filter((m) => m && String(m.id) !== String(movieId))
 			.map((m) => mapTMDBMovieToMovie(m));
 
 		const similarIdSet = new Set(similarMovies.map((m) => m.id));

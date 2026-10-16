@@ -6,6 +6,8 @@
 	import GenreTile from '#lib/components/movie/GenreTile.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
 	import { GENRES } from '#lib/data/mock-movies';
+	import { watchlistState } from '#lib/watchlist.svelte';
+	import { personalizationState } from '#lib/personalization.svelte';
 	import { ArrowRight, Film } from 'lucide-svelte';
 
 	interface Props {
@@ -13,6 +15,9 @@
 	}
 
 	let { data }: Props = $props();
+
+	let recentlyViewed = $derived(personalizationState.recentlyViewedMovies);
+	let watchlistMovies = $derived(watchlistState.movies);
 </script>
 
 <svelte:head>
@@ -64,6 +69,25 @@
 		error={data.trending.error}
 		viewAllHref="/explore"
 	/>
+
+	<!-- Personalized: Watchlist Quick Queue (Only shown when user has saved titles) -->
+	{#if watchlistMovies.length > 0}
+		<MovieRow
+			title="From Your Watchlist"
+			subtitle="Titles in your saved collection ready for viewing"
+			movies={watchlistMovies}
+			viewAllHref="/watchlist"
+		/>
+	{/if}
+
+	<!-- Personalized: Recently Viewed (Only shown when user has browsing history) -->
+	{#if recentlyViewed.length > 0}
+		<MovieRow
+			title="Recently Viewed"
+			subtitle="Pick up where you left off from your recent explorations"
+			movies={recentlyViewed}
+		/>
+	{/if}
 
 	<!-- C. Now Playing in Theaters (Horizontal Row) -->
 	<MovieRow
