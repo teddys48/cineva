@@ -97,10 +97,7 @@ export function parseRecentlyViewed(rawJson: string | null): RecentlyViewedItem[
 		let rawItems: unknown[] = [];
 		if (Array.isArray(parsed)) {
 			rawItems = parsed;
-		} else if (
-			'items' in parsed &&
-			Array.isArray((parsed as { items: unknown[] }).items)
-		) {
+		} else if ('items' in parsed && Array.isArray((parsed as { items: unknown[] }).items)) {
 			rawItems = (parsed as { items: unknown[] }).items;
 		} else {
 			return [];
@@ -187,8 +184,7 @@ export class PersonalizationState {
 
 		try {
 			const searchRaw =
-				localStorage.getItem(SEARCH_HISTORY_KEY) ||
-				localStorage.getItem(LEGACY_SEARCH_HISTORY_KEY);
+				localStorage.getItem(SEARCH_HISTORY_KEY) || localStorage.getItem(LEGACY_SEARCH_HISTORY_KEY);
 			this.searchHistory = parseSearchHistory(searchRaw);
 		} catch {
 			this.searchHistory = [];

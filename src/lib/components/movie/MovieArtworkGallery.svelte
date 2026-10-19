@@ -57,9 +57,7 @@
 		showAllPosters ? gallery.posters : gallery.posters.slice(0, ARTWORK_LIMIT)
 	);
 
-	let visibleLogos = $derived(
-		showAllLogos ? gallery.logos : gallery.logos.slice(0, ARTWORK_LIMIT)
-	);
+	let visibleLogos = $derived(showAllLogos ? gallery.logos : gallery.logos.slice(0, ARTWORK_LIMIT));
 
 	let visibleActiveItems = $derived(
 		showAllCategory ? activeItems : activeItems.slice(0, ARTWORK_LIMIT)
@@ -502,9 +500,7 @@
 									class="inline-flex items-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 py-2.5 text-xs font-semibold text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
 								>
 									<span>
-										{showAllLogos
-											? 'Show Less Logos'
-											: `Show More Logos (${gallery.logos.length})`}
+										{showAllLogos ? 'Show Less Logos' : `Show More Logos (${gallery.logos.length})`}
 									</span>
 									{#if showAllLogos}
 										<ChevronUp class="h-3.5 w-3.5 text-cinema-accent" />

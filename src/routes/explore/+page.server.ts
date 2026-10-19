@@ -3,6 +3,8 @@ import {
 	discoverMovies,
 	getMovieGenres,
 	mapTMDBMovieToMovie,
+	formatCountryName,
+	formatLanguageName,
 	VALID_SORT_OPTIONS
 } from '#lib/server/tmdb';
 import type { Movie } from '#lib/types/movie';
@@ -53,13 +55,29 @@ export const load: PageServerLoad = async ({ url, fetch, setHeaders }) => {
 	const validMinRating =
 		!isNaN(rawRating) && rawRating >= 0 && rawRating <= 10 ? Math.round(rawRating * 10) / 10 : null;
 
-	// 4. Parse and sanitize sort_by
+	// 4. Parse and sanitize language
+	const rawLanguage = (url.searchParams.get('language') || url.searchParams.get('lang') || '')
+		.trim()
+		.toLowerCase();
+	const validLanguage = /^[a-z]{2}$/.test(rawLanguage) ? rawLanguage : undefined;
+	const languageName = validLanguage ? formatLanguageName(validLanguage) : undefined;
+
+	// 5. Parse and sanitize country
+	const rawCountry = (url.searchParams.get('country') || '').trim().toUpperCase();
+	const validCountry = /^[A-Z]{2}$/.test(rawCountry) ? rawCountry : undefined;
+	const countryName = validCountry ? formatCountryName(validCountry) : undefined;
+
+	// 6. Parse and sanitize company
+	const rawCompany = (url.searchParams.get('company') || '').trim();
+	const validCompany = /^\d+$/.test(rawCompany) ? parseInt(rawCompany, 10) : undefined;
+
+	// 7. Parse and sanitize sort_by
 	const rawSort = url.searchParams.get('sortBy') || url.searchParams.get('sort') || '';
 	const validSortBy: TMDBSortOption = VALID_SORT_OPTIONS.includes(rawSort as TMDBSortOption)
 		? (rawSort as TMDBSortOption)
 		: 'popularity.desc';
 
-	// 5. Parse and sanitize page (TMDB bounds: 1 to 500)
+	// 8. Parse and sanitize page (TMDB bounds: 1 to 500)
 	const rawPage = parseInt(url.searchParams.get('page') || '1', 10);
 	const validPage = Math.max(1, Math.min(500, isNaN(rawPage) ? 1 : rawPage));
 
@@ -71,6 +89,9 @@ export const load: PageServerLoad = async ({ url, fetch, setHeaders }) => {
 				with_genres: selectedGenreId ?? undefined,
 				primary_release_year: validYear ?? undefined,
 				min_rating: validMinRating ?? undefined,
+				with_original_language: validLanguage,
+				with_origin_country: validCountry,
+				with_companies: validCompany,
 				sort_by: validSortBy
 			},
 			fetch
@@ -88,6 +109,11 @@ export const load: PageServerLoad = async ({ url, fetch, setHeaders }) => {
 				genreName: selectedGenreName,
 				year: validYear,
 				minRating: validMinRating,
+				language: validLanguage || '',
+				languageName: languageName || '',
+				country: validCountry || '',
+				countryName: countryName || '',
+				company: validCompany ? String(validCompany) : '',
 				sortBy: validSortBy,
 				page: validPage
 			},
@@ -105,6 +131,11 @@ export const load: PageServerLoad = async ({ url, fetch, setHeaders }) => {
 				genreName: selectedGenreName,
 				year: validYear,
 				minRating: validMinRating,
+				language: validLanguage || '',
+				languageName: languageName || '',
+				country: validCountry || '',
+				countryName: countryName || '',
+				company: validCompany ? String(validCompany) : '',
 				sortBy: validSortBy,
 				page: validPage
 			},

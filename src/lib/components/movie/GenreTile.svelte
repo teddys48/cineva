@@ -39,7 +39,10 @@
 	>
 		{#if IconComponent}
 			{@const Icon = IconComponent}
-			<Icon class="h-6 w-6 transition-transform duration-300 group-hover:scale-105" aria-hidden="true" />
+			<Icon
+				class="h-6 w-6 transition-transform duration-300 group-hover:scale-105"
+				aria-hidden="true"
+			/>
 		{/if}
 	</div>
 
@@ -50,7 +53,9 @@
 		>
 			{genre.name}
 		</h3>
-		<p class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-cinema-text-muted transition-colors duration-200 group-hover:text-cinema-text/80">
+		<p
+			class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-cinema-text-muted transition-colors duration-200 group-hover:text-cinema-text/80"
+		>
 			{genre.description}
 		</p>
 	</div>

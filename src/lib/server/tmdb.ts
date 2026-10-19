@@ -14,8 +14,24 @@ import type {
 	TMDBPersonMovieCredits,
 	TMDBPersonCrewCredit,
 	TMDBMovieImagesResponse,
-	TMDBImageItem
+	TMDBImageItem,
+	TMDBPersonSearchResult,
+	TMDBCompanySearchResult
 } from '#lib/types/tmdb';
+import type {
+	SearchPerson,
+	SearchCompany,
+	UnifiedSearchOptions,
+	UnifiedSearchResult
+} from '#lib/types/search';
+import {
+	interpretQuery,
+	GENRE_MAP,
+	resolveGenre,
+	resolveLanguage,
+	resolveCountry,
+	buildActiveFilterItems
+} from '#lib/search-query';
 import type {
 	Movie,
 	MovieDetail,
@@ -967,7 +983,7 @@ export async function discoverMovies(
 		page,
 		sort_by: sortBy,
 		language: options.language ?? 'en-US',
-		include_adult: false
+		include_adult: options.include_adult ?? false
 	};
 
 	if (options.with_genres) {
@@ -986,12 +1002,33 @@ export async function discoverMovies(
 		params['with_original_language'] = String(options.with_original_language).trim().toLowerCase();
 	}
 
-	if (
-		options.primary_release_year &&
-		options.primary_release_year >= 1888 &&
-		options.primary_release_year <= new Date().getFullYear() + 5
-	) {
-		params['primary_release_year'] = options.primary_release_year;
+	if (options.with_people) {
+		params['with_people'] = String(options.with_people);
+	}
+
+	if (options.with_crew) {
+		params['with_crew'] = String(options.with_crew);
+	}
+
+	if (options.with_cast) {
+		params['with_cast'] = String(options.with_cast);
+	}
+
+	const targetYear = options.primary_release_year ?? options.year;
+	if (targetYear && targetYear >= 1888 && targetYear <= new Date().getFullYear() + 5) {
+		params['primary_release_year'] = targetYear;
+	}
+
+	if (options.primary_release_date_gte) {
+		params['primary_release_date.gte'] = options.primary_release_date_gte;
+	} else if (options.year_gte && options.year_gte >= 1888) {
+		params['primary_release_date.gte'] = `${options.year_gte}-01-01`;
+	}
+
+	if (options.primary_release_date_lte) {
+		params['primary_release_date.lte'] = options.primary_release_date_lte;
+	} else if (options.year_lte && options.year_lte >= 1888) {
+		params['primary_release_date.lte'] = `${options.year_lte}-12-31`;
 	}
 
 	if (
@@ -1009,6 +1046,360 @@ export async function discoverMovies(
 	}
 
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>('/discover/movie', params, fetchFn);
+}
+
+/**
+ * Search people (actors, directors, writers, crew) by name
+ */
+export async function searchPeople(
+	options: { query: string; page?: number; language?: string; include_adult?: boolean },
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBPersonSearchResult>> {
+	const trimmedQuery = (options.query || '').trim();
+	if (!trimmedQuery) {
+		return {
+			page: 1,
+			results: [],
+			total_pages: 0,
+			total_results: 0
+		};
+	}
+
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBPersonSearchResult>>(
+		'/search/person',
+		{
+			query: trimmedQuery.slice(0, 150),
+			page,
+			language: options.language ?? 'en-US',
+			include_adult: options.include_adult ?? false
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Transform raw TMDB person search result into Cineva SearchPerson model
+ */
+export function mapTMDBPersonSearchResult(item: TMDBPersonSearchResult): SearchPerson {
+	const knownForTitles = (item.known_for || [])
+		.map((k) => k.title || k.original_title || '')
+		.filter((t): t is string => Boolean(t && t.trim() !== ''));
+
+	return {
+		id: String(item.id),
+		name: item.name?.trim() || 'Unknown',
+		profileUrl: getProfileUrl(item.profile_path, 'w185'),
+		knownForDepartment: item.known_for_department?.trim() || undefined,
+		knownForTitles,
+		popularity: typeof item.popularity === 'number' ? Number(item.popularity.toFixed(1)) : undefined
+	};
+}
+
+/**
+ * Search production companies by name
+ */
+export async function searchCompanies(
+	options: { query: string; page?: number },
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBCompanySearchResult>> {
+	const trimmedQuery = (options.query || '').trim();
+	if (!trimmedQuery) {
+		return {
+			page: 1,
+			results: [],
+			total_pages: 0,
+			total_results: 0
+		};
+	}
+
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBCompanySearchResult>>(
+		'/search/company',
+		{
+			query: trimmedQuery.slice(0, 150),
+			page
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Transform raw TMDB company search result into Cineva SearchCompany model
+ */
+export function mapTMDBCompanySearchResult(item: TMDBCompanySearchResult): SearchCompany {
+	return {
+		id: String(item.id),
+		name: item.name?.trim() || 'Unknown Company',
+		logoUrl: getLogoUrl(item.logo_path, 'w300'),
+		originCountry: item.origin_country?.trim() || undefined
+	};
+}
+
+/**
+ * Unified discovery and multi-entity search orchestrator
+ */
+export async function unifiedSearch(
+	options: UnifiedSearchOptions,
+	fetchFn: typeof fetch = fetch
+): Promise<UnifiedSearchResult> {
+	const rawQuery = (options.query || '').trim();
+	const currentPage = Math.max(1, Math.min(500, options.page ?? 1));
+	const genres = await getMovieGenres(fetchFn).catch(() => []);
+
+	const interpretation = interpretQuery(rawQuery);
+
+	let resolvedGenreId: number | undefined = options.genre ? Number(options.genre) : undefined;
+	let resolvedGenreName: string | undefined = undefined;
+
+	if (!resolvedGenreId && interpretation.discoveryFilters.genreId) {
+		resolvedGenreId = interpretation.discoveryFilters.genreId;
+		resolvedGenreName = interpretation.discoveryFilters.genreName;
+	} else if (resolvedGenreId) {
+		const found = genres.find((g) => g.id === resolvedGenreId);
+		resolvedGenreName = found?.name || GENRE_MAP[resolvedGenreId];
+	}
+
+	let resolvedYear: number | undefined =
+		options.year && !isNaN(options.year) ? options.year : undefined;
+	if (!resolvedYear && interpretation.discoveryFilters.year) {
+		resolvedYear = interpretation.discoveryFilters.year;
+	}
+
+	let resolvedLanguage: string | undefined = options.language?.trim().toLowerCase();
+	if (!resolvedLanguage && interpretation.discoveryFilters.languageCode) {
+		resolvedLanguage = interpretation.discoveryFilters.languageCode;
+	}
+
+	let resolvedCountry: string | undefined = options.country?.trim().toUpperCase();
+	if (!resolvedCountry && interpretation.discoveryFilters.countryCode) {
+		resolvedCountry = interpretation.discoveryFilters.countryCode;
+	}
+
+	let resolvedCompany: string | number | undefined = options.company;
+	if (!resolvedCompany && interpretation.discoveryFilters.companyId) {
+		resolvedCompany = interpretation.discoveryFilters.companyId;
+	}
+
+	const minRating =
+		typeof options.minRating === 'number' && options.minRating > 0 ? options.minRating : undefined;
+	const sortBy = options.sortBy || 'popularity.desc';
+
+	const hasActiveFilters = Boolean(
+		resolvedGenreId ||
+		resolvedYear ||
+		resolvedLanguage ||
+		resolvedCountry ||
+		resolvedCompany ||
+		minRating
+	);
+
+	let movies: Movie[] = [];
+	let people: SearchPerson[] = [];
+	let companies: SearchCompany[] = [];
+	let totalResults = 0;
+	let totalPages = 0;
+
+	if (!rawQuery && !hasActiveFilters) {
+		return {
+			query: '',
+			interpretation,
+			movies: [],
+			people: [],
+			companies: [],
+			activeFilters: [],
+			totalResults: 0,
+			totalPages: 0,
+			page: 1,
+			error: null,
+			genres
+		};
+	}
+
+	// Route 1: Pure Year query, or Metadata-filtered discovery query, or user applied metadata filters
+	if (
+		interpretation.isYearOnly ||
+		(interpretation.isMetadataDiscovery && !interpretation.titleWithYear) ||
+		(hasActiveFilters &&
+			(!rawQuery ||
+				rawQuery === String(resolvedYear) ||
+				resolveGenre(rawQuery) ||
+				resolveLanguage(rawQuery) ||
+				resolveCountry(rawQuery)))
+	) {
+		let crewFilter: number | undefined = undefined;
+		let castFilter: number | undefined = undefined;
+
+		if (interpretation.personIntent) {
+			const personRes = await searchPeople(
+				{ query: interpretation.personIntent.name },
+				fetchFn
+			).catch(() => null);
+			if (personRes?.results && personRes.results.length > 0) {
+				const topPerson = personRes.results[0];
+				people = personRes.results.slice(0, 3).map(mapTMDBPersonSearchResult);
+				if (interpretation.personIntent.role === 'director') {
+					crewFilter = topPerson.id;
+				} else if (interpretation.personIntent.role === 'actor') {
+					castFilter = topPerson.id;
+				}
+			}
+		}
+
+		const discoverData = await discoverMovies(
+			{
+				page: currentPage,
+				with_genres: resolvedGenreId,
+				primary_release_year: resolvedYear,
+				with_original_language: resolvedLanguage,
+				with_origin_country: resolvedCountry,
+				with_companies: resolvedCompany,
+				with_crew: crewFilter,
+				with_cast: castFilter,
+				min_rating: minRating,
+				sort_by: sortBy,
+				include_adult: options.includeAdult
+			},
+			fetchFn
+		);
+
+		movies = (discoverData.results || []).map((m) => mapTMDBMovieToMovie(m));
+		totalPages = discoverData.total_pages || 0;
+		totalResults = discoverData.total_results || 0;
+	} else if (interpretation.titleWithYear) {
+		// Route 2: Title with release year, e.g. "Dune 2024"
+		const { title, year } = interpretation.titleWithYear;
+		const searchData = await searchMovies(
+			{
+				query: title,
+				primary_release_year: year,
+				page: currentPage,
+				include_adult: options.includeAdult
+			},
+			fetchFn
+		);
+
+		if (searchData.results && searchData.results.length > 0) {
+			movies = searchData.results.map((m) => mapTMDBMovieToMovie(m));
+			totalPages = searchData.total_pages || 0;
+			totalResults = searchData.total_results || 0;
+		} else if (currentPage === 1) {
+			// Fallback: search raw query string if year constraint yielded no matches
+			const fallbackData = await searchMovies(
+				{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+				fetchFn
+			);
+			movies = (fallbackData.results || []).map((m) => mapTMDBMovieToMovie(m));
+			totalPages = fallbackData.total_pages || 0;
+			totalResults = fallbackData.total_results || 0;
+		}
+	} else {
+		// Route 3: General Text Query (e.g. "Interstellar", "Christopher Nolan", "Warner Bros.")
+		const [movieResult, personResult, companyResult] = await Promise.allSettled([
+			searchMovies(
+				{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+				fetchFn
+			),
+			searchPeople(
+				{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+				fetchFn
+			),
+			rawQuery.length >= 3
+				? searchCompanies({ query: rawQuery, page: 1 }, fetchFn)
+				: Promise.resolve(null)
+		]);
+
+		if (movieResult.status === 'rejected') {
+			throw movieResult.reason;
+		}
+		if (movieResult.status === 'fulfilled' && movieResult.value) {
+			movies = (movieResult.value.results || []).map((m) => mapTMDBMovieToMovie(m));
+			totalPages = movieResult.value.total_pages || 0;
+			totalResults = movieResult.value.total_results || 0;
+		}
+
+		if (personResult.status === 'fulfilled' && personResult.value) {
+			people = (personResult.value.results || []).slice(0, 8).map(mapTMDBPersonSearchResult);
+		}
+
+		if (
+			companyResult.status === 'fulfilled' &&
+			companyResult.value &&
+			companyResult.value.results
+		) {
+			companies = companyResult.value.results.slice(0, 4).map(mapTMDBCompanySearchResult);
+		}
+
+		// If movies is empty, but top person matched (e.g. Christopher Nolan, Cillian Murphy):
+		// provide filmography credits so the user immediately discovers their films
+		if (movies.length === 0 && people.length > 0) {
+			const topPersonId = people[0].id;
+			const personCredits = await getPersonMovieCredits(topPersonId, fetchFn).catch(() => null);
+			if (personCredits) {
+				const castMovies = (personCredits.cast || []).map((m) =>
+					mapTMDBMovieToMovie({
+						...m,
+						title: m.title || m.original_title || 'Untitled',
+						overview: m.overview || '',
+						poster_path: m.poster_path || null,
+						backdrop_path: m.backdrop_path || null,
+						vote_average: m.vote_average ?? 0,
+						vote_count: m.vote_count ?? 0
+					})
+				);
+				const crewMovies = (personCredits.crew || []).map((m) =>
+					mapTMDBMovieToMovie({
+						...m,
+						title: m.title || m.original_title || 'Untitled',
+						overview: m.overview || '',
+						poster_path: m.poster_path || null,
+						backdrop_path: m.backdrop_path || null,
+						vote_average: m.vote_average ?? 0,
+						vote_count: m.vote_count ?? 0
+					})
+				);
+				const seenIds = new Set<string>();
+				const combined: Movie[] = [];
+				for (const m of [...crewMovies, ...castMovies]) {
+					if (!seenIds.has(m.id)) {
+						seenIds.add(m.id);
+						combined.push(m);
+					}
+				}
+				combined.sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0));
+				movies = combined.slice(0, 20);
+				totalResults = movies.length;
+				totalPages = 1;
+			}
+		}
+	}
+
+	const activeFilters = buildActiveFilterItems({
+		genre: resolvedGenreId,
+		genreName: resolvedGenreName,
+		year: resolvedYear,
+		minRating,
+		language: resolvedLanguage,
+		country: resolvedCountry,
+		company: resolvedCompany,
+		sortBy: sortBy !== 'popularity.desc' ? sortBy : undefined
+	});
+
+	return {
+		query: rawQuery,
+		interpretation,
+		movies,
+		people,
+		companies,
+		activeFilters,
+		totalResults,
+		totalPages,
+		page: currentPage,
+		error: null,
+		genres
+	};
 }
 
 /**

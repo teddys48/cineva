@@ -83,7 +83,7 @@
 			class="mt-10 flex flex-col items-center justify-between gap-4 border-t border-cinema-border-subtle pt-6 text-xs text-cinema-text-muted sm:flex-row"
 		>
 			<p>&copy; {new Date().getFullYear()} Cineva. Designed for film lovers.</p>
-			<p class="font-mono text-[11px] text-cinema-text-muted/70\">Powered by TMDB API v3</p>
+			<p class="text-cinema-text-muted/70\ font-mono text-[11px]">Powered by TMDB API v3</p>
 		</div>
 	</div>
 </footer>

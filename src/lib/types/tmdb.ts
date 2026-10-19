@@ -179,10 +179,19 @@ export interface DiscoverMoviesOptions {
 	with_origin_country?: string;
 	with_original_language?: string;
 	primary_release_year?: number;
+	year?: number;
 	min_rating?: number;
 	sort_by?: TMDBSortOption | string;
 	language?: string;
 	vote_count_gte?: number;
+	with_people?: string | number;
+	with_crew?: string | number;
+	with_cast?: string | number;
+	primary_release_date_gte?: string;
+	primary_release_date_lte?: string;
+	year_gte?: number;
+	year_lte?: number;
+	include_adult?: boolean;
 }
 
 export interface ExploreFilters {
@@ -191,6 +200,9 @@ export interface ExploreFilters {
 	minRating?: number;
 	sortBy?: string;
 	page?: number;
+	language?: string;
+	country?: string;
+	company?: string;
 }
 
 /**
@@ -210,6 +222,42 @@ export interface TMDBPerson {
 	popularity?: number;
 	homepage?: string | null;
 	imdb_id?: string | null;
+}
+
+export interface TMDBPersonSearchResult {
+	id: number;
+	name: string;
+	original_name?: string;
+	profile_path: string | null;
+	adult?: boolean;
+	popularity?: number;
+	known_for_department?: string;
+	known_for?: TMDBMovie[];
+}
+
+export interface TMDBCompanySearchResult {
+	id: number;
+	name: string;
+	logo_path: string | null;
+	origin_country?: string;
+}
+
+export interface TMDBMultiSearchResultItem {
+	id: number;
+	media_type: 'movie' | 'person' | 'tv';
+	title?: string;
+	name?: string;
+	poster_path?: string | null;
+	profile_path?: string | null;
+	backdrop_path?: string | null;
+	release_date?: string;
+	vote_average?: number;
+	vote_count?: number;
+	overview?: string;
+	genre_ids?: number[];
+	known_for_department?: string;
+	known_for?: TMDBMovie[];
+	popularity?: number;
 }
 
 export interface TMDBPersonCastCredit {
