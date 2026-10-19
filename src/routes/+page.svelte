@@ -139,14 +139,14 @@
 				</div>
 				<a
 					href="/explore"
-					class="hidden items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold text-cinema-accent hover:underline focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none sm:inline-flex"
+					class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-cinema-accent transition-all duration-200 hover:text-cinema-accent-hover hover:underline focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none"
 				>
 					<span>All Genres</span>
 					<ArrowRight class="h-3.5 w-3.5" />
 				</a>
 			</div>
 
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+			<div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
 				{#each GENRES as genre (genre.id)}
 					<GenreTile {genre} />
 				{/each}
