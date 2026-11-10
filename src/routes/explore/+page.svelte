@@ -4,6 +4,7 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import type { PageData } from './$types';
 	import MovieGrid from '#lib/components/movie/MovieGrid.svelte';
+	import TVCard from '#lib/components/tv/TVCard.svelte';
 	import MovieCardSkeleton from '#lib/components/movie/MovieCardSkeleton.svelte';
 	import Pagination from '#lib/components/ui/Pagination.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
@@ -16,7 +17,9 @@
 		Calendar,
 		Star,
 		ArrowUpDown,
-		ChevronDown
+		ChevronDown,
+		Film,
+		Tv
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -75,6 +78,7 @@
 	});
 
 	function buildFilterUrl(newFilters: {
+		contentType?: 'movie' | 'tv';
 		genre?: string | number | null;
 		year?: number | null;
 		minRating?: number | null;
@@ -82,6 +86,9 @@
 		page?: number | null;
 	}): string {
 		const params = new SvelteURLSearchParams();
+
+		const type = newFilters.contentType !== undefined ? newFilters.contentType : data.contentType;
+		if (type === 'tv') params.set('type', 'tv');
 
 		const genre = newFilters.genre !== undefined ? newFilters.genre : data.filters.genre;
 		if (genre) params.set('genre', String(genre));
@@ -120,23 +127,33 @@
 		window.scrollTo({ top: 120, behavior: 'smooth' });
 	}
 
+	function handleTypeChange(newType: 'movie' | 'tv') {
+		const nextUrl = buildFilterUrl({ contentType: newType, genre: null, page: 1 });
+		goto(nextUrl);
+	}
+
 	function resetAllFilters() {
-		goto('/explore');
+		if (data.contentType === 'tv') {
+			goto('/explore?type=tv');
+		} else {
+			goto('/explore');
+		}
 	}
 
 	let canonicalUrl = $derived(page.url.href);
+	let contentTypeName = $derived(data.contentType === 'tv' ? 'TV Shows' : 'Movies');
 	let metaDescription = $derived(
 		currentGenreName
-			? `Explore curated ${currentGenreName} movies, release eras, and ratings powered by TMDB on Cineva.`
-			: 'Explore curated cinema across genres, release eras, and ratings powered by TMDB on Cineva.'
+			? `Explore curated ${currentGenreName} ${data.contentType === 'tv' ? 'TV shows and series' : 'movies'}, release eras, and ratings powered by TMDB on Cineva.`
+			: `Explore curated ${data.contentType === 'tv' ? 'TV series and drama' : 'cinema'} across genres, release eras, and ratings powered by TMDB on Cineva.`
 	);
 </script>
 
 <svelte:head>
 	<title
 		>{currentGenreName
-			? `${currentGenreName} Movies — Explore Cineva`
-			: 'Explore Cinema — Cineva'}</title
+			? `${currentGenreName} ${contentTypeName} — Explore Cineva`
+			: (data.contentType === 'tv' ? 'Explore TV Shows — Cineva' : 'Explore Cinema — Cineva')}</title
 	>
 	<meta name="description" content={metaDescription} />
 	<link rel="canonical" href={canonicalUrl} />
@@ -146,8 +163,8 @@
 	<meta
 		property="og:title"
 		content={currentGenreName
-			? `${currentGenreName} Movies — Explore Cineva`
-			: 'Explore Cinema — Cineva'}
+			? `${currentGenreName} ${contentTypeName} — Explore Cineva`
+			: (data.contentType === 'tv' ? 'Explore TV Shows — Cineva' : 'Explore Cinema — Cineva')}
 	/>
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:type" content="website" />
@@ -158,8 +175,8 @@
 	<meta
 		name="twitter:title"
 		content={currentGenreName
-			? `${currentGenreName} Movies — Explore Cineva`
-			: 'Explore Cinema — Cineva'}
+			? `${currentGenreName} ${contentTypeName} — Explore Cineva`
+			: (data.contentType === 'tv' ? 'Explore TV Shows — Cineva' : 'Explore Cinema — Cineva')}
 	/>
 	<meta name="twitter:description" content={metaDescription} />
 </svelte:head>
@@ -167,9 +184,35 @@
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 	<!-- Page Header -->
 	<div class="border-b border-cinema-border pb-6">
-		<div class="flex items-center gap-2 text-xs font-semibold tracking-wider text-cinema-accent">
-			<Compass class="h-4 w-4" />
-			<span>EXPLORE CINEMA</span>
+		<div class="flex flex-wrap items-center justify-between gap-4">
+			<div class="flex items-center gap-2 text-xs font-semibold tracking-wider text-cinema-accent">
+				<Compass class="h-4 w-4" />
+				<span>{data.contentType === 'tv' ? 'EXPLORE TV SERIES' : 'EXPLORE CINEMA'}</span>
+			</div>
+
+			<!-- Content-Type Switcher -->
+			<div class="inline-flex rounded-xl border border-cinema-border bg-cinema-surface p-1 shadow-xs">
+				<button
+					type="button"
+					onclick={() => handleTypeChange('movie')}
+					class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all {data.contentType === 'movie'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+						: 'text-cinema-text-muted hover:text-cinema-text'}"
+				>
+					<Film class="h-3.5 w-3.5" />
+					<span>Movies</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => handleTypeChange('tv')}
+					class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all {data.contentType === 'tv'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+						: 'text-cinema-text-muted hover:text-cinema-text'}"
+				>
+					<Tv class="h-3.5 w-3.5" />
+					<span>TV Shows</span>
+				</button>
+			</div>
 		</div>
 		<h1
 			class="mt-2 font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-cinema-text sm:text-4xl"
@@ -458,7 +501,21 @@
 					<MovieCardSkeleton />
 				{/each}
 			</div>
-		{:else if data.movies.length > 0}
+		{:else if data.contentType === 'tv' && data.tvShows.length > 0}
+			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-5">
+				{#each data.tvShows as show (show.id)}
+					<TVCard {show} />
+				{/each}
+			</div>
+
+			<!-- Pagination Controls -->
+			<Pagination
+				currentPage={data.filters.page}
+				totalPages={data.totalPages}
+				getPageUrl={(p) => buildFilterUrl({ page: p })}
+				onPageSelect={handlePageSelect}
+			/>
+		{:else if data.contentType === 'movie' && data.movies.length > 0}
 			<MovieGrid movies={data.movies} />
 
 			<!-- Pagination Controls -->
@@ -470,7 +527,7 @@
 			/>
 		{:else}
 			<EmptyState
-				title="No Matching Movies Found"
+				title={`No Matching ${contentTypeName} Found`}
 				description="We couldn't find any films matching the selected criteria ({[
 					currentGenreName,
 					data.filters.year,

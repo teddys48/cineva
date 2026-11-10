@@ -1,16 +1,20 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { untrack } from 'svelte';
 import type { Movie, MovieDetail } from './types/movie';
+import type { TVShow, TVDetail } from './types/tv';
+import type { PersonCreditTV } from './types/person';
 import type {
 	WatchlistItem,
 	WatchlistStorageData,
 	WatchlistSortOption,
+	WatchlistMediaType,
+	WatchlistContentTypeFilter,
 	ToastMessage
 } from './types/watchlist';
 
 export const WATCHLIST_STORAGE_KEY = 'cineva:watchlist';
 export const LEGACY_WATCHLIST_STORAGE_KEY = 'scenora:watchlist';
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /**
  * Validates and sanitizes a raw object into a valid WatchlistItem.
@@ -25,10 +29,11 @@ export function sanitizeWatchlistItem(raw: unknown): WatchlistItem | null {
 	const id = String(rawId).trim();
 	if (!id) return null;
 
-	const rawTitle = record.title;
+	const rawTitle = record.title ?? record.name;
 	if (typeof rawTitle !== 'string' || !rawTitle.trim()) return null;
 	const title = rawTitle.trim();
 
+	const mediaType: WatchlistMediaType = record.mediaType === 'tv' ? 'tv' : 'movie';
 	const posterUrl = typeof record.posterUrl === 'string' ? record.posterUrl : '';
 	const backdropUrl = typeof record.backdropUrl === 'string' ? record.backdropUrl : '';
 	const overview = typeof record.overview === 'string' ? record.overview.slice(0, 300) : '';
@@ -36,8 +41,15 @@ export function sanitizeWatchlistItem(raw: unknown): WatchlistItem | null {
 	let releaseYear: number | null = null;
 	if (typeof record.releaseYear === 'number' && !Number.isNaN(record.releaseYear)) {
 		releaseYear = record.releaseYear;
+	} else if (typeof record.firstAirYear === 'number' && !Number.isNaN(record.firstAirYear)) {
+		releaseYear = record.firstAirYear;
 	} else if (typeof record.releaseYear === 'string') {
 		const parsed = parseInt(record.releaseYear, 10);
+		if (!Number.isNaN(parsed) && parsed > 1880 && parsed < 2100) {
+			releaseYear = parsed;
+		}
+	} else if (typeof record.firstAirYear === 'string') {
+		const parsed = parseInt(record.firstAirYear, 10);
 		if (!Number.isNaN(parsed) && parsed > 1880 && parsed < 2100) {
 			releaseYear = parsed;
 		}
@@ -65,6 +77,7 @@ export function sanitizeWatchlistItem(raw: unknown): WatchlistItem | null {
 	return {
 		id,
 		title,
+		mediaType,
 		posterUrl,
 		backdropUrl,
 		releaseYear,
@@ -78,6 +91,7 @@ export function sanitizeWatchlistItem(raw: unknown): WatchlistItem | null {
 
 /**
  * Validates stored JSON string and returns sanitized items list.
+ * Preserves backwards compatibility with legacy unversioned schemas and version 1.
  */
 export function parseWatchlistStorage(rawJson: string | null): WatchlistItem[] {
 	if (!rawJson) return [];
@@ -98,13 +112,16 @@ export function parseWatchlistStorage(rawJson: string | null): WatchlistItem[] {
 		}
 
 		const items: WatchlistItem[] = [];
-		const seenIds = new SvelteSet<string>();
+		const seenKeys = new SvelteSet<string>();
 
 		for (const rawItem of rawItems) {
 			const sanitized = sanitizeWatchlistItem(rawItem);
-			if (sanitized && !seenIds.has(sanitized.id)) {
-				seenIds.add(sanitized.id);
-				items.push(sanitized);
+			if (sanitized) {
+				const key = `${sanitized.mediaType}:${sanitized.id}`;
+				if (!seenKeys.has(key)) {
+					seenKeys.add(key);
+					items.push(sanitized);
+				}
 			}
 		}
 
@@ -122,6 +139,7 @@ export function movieToWatchlistItem(movie: Movie | MovieDetail): WatchlistItem 
 	return {
 		id: String(movie.id),
 		title: movie.title,
+		mediaType: 'movie',
 		posterUrl: movie.posterUrl || '',
 		backdropUrl: movie.backdropUrl || '',
 		releaseYear: movie.releaseYear ?? null,
@@ -129,6 +147,26 @@ export function movieToWatchlistItem(movie: Movie | MovieDetail): WatchlistItem 
 		genres: movie.genres ? movie.genres.slice(0, 4) : [],
 		runtime: movie.runtime,
 		overview: movie.overview ? movie.overview.slice(0, 240) : '',
+		savedAt: Date.now()
+	};
+}
+
+/**
+ * Convert any TVShow or TVDetail into a compact WatchlistItem.
+ */
+export function tvShowToWatchlistItem(tvShow: TVShow | TVDetail): WatchlistItem {
+	return {
+		id: String(tvShow.id),
+		title: tvShow.name || tvShow.title,
+		mediaType: 'tv',
+		posterUrl: tvShow.posterUrl || '',
+		backdropUrl: tvShow.backdropUrl || '',
+		releaseYear: tvShow.firstAirYear ?? null,
+		rating: tvShow.rating ?? null,
+		genres: tvShow.genres ? tvShow.genres.slice(0, 4) : [],
+		runtime:
+			'episodeRuntime' in tvShow && tvShow.episodeRuntime ? tvShow.episodeRuntime : undefined,
+		overview: tvShow.overview ? tvShow.overview.slice(0, 240) : '',
 		savedAt: Date.now()
 	};
 }
@@ -147,6 +185,24 @@ export function watchlistItemToMovie(item: WatchlistItem): Movie {
 		genres: item.genres || [],
 		runtime: item.runtime,
 		overview: item.overview || ''
+	};
+}
+
+/**
+ * Convert a stored WatchlistItem into a TVShow object for component rendering.
+ */
+export function watchlistItemToTVShow(item: WatchlistItem): TVShow {
+	return {
+		id: item.id,
+		title: item.title,
+		name: item.title,
+		posterUrl: item.posterUrl,
+		backdropUrl: item.backdropUrl || '',
+		firstAirYear: item.releaseYear,
+		rating: item.rating,
+		genres: item.genres || [],
+		overview: item.overview || '',
+		mediaType: 'tv'
 	};
 }
 
@@ -222,48 +278,97 @@ export class WatchlistState {
 		}
 	}
 
-	has(movieId: string | number): boolean {
-		const targetId = String(movieId);
-		return this.items.some((item) => item.id === targetId);
+	has(
+		target: string | number | { id: string | number; mediaType?: WatchlistMediaType },
+		mediaType?: WatchlistMediaType
+	): boolean {
+		const targetId =
+			typeof target === 'object' && target !== null ? String(target.id) : String(target);
+		const targetType: WatchlistMediaType =
+			mediaType ??
+			(typeof target === 'object' &&
+			target !== null &&
+			'mediaType' in target &&
+			target.mediaType === 'tv'
+				? 'tv'
+				: 'movie');
+		return this.items.some((item) => item.id === targetId && item.mediaType === targetType);
 	}
 
-	add(movie: Movie | MovieDetail): boolean {
+	add(
+		target: Movie | MovieDetail | TVShow | TVDetail | PersonCreditTV | WatchlistItem,
+		mediaType?: WatchlistMediaType
+	): boolean {
 		return untrack(() => {
-			const targetId = String(movie.id);
+			const targetId = String(target.id);
+			const targetType: WatchlistMediaType =
+				mediaType ??
+				('mediaType' in target && target.mediaType === 'tv'
+					? 'tv'
+					: 'movie');
+			const targetTitle =
+				'name' in target && typeof target.name === 'string' && target.name
+					? target.name
+					: target.title;
 
-			if (this.has(targetId)) {
+			if (this.has(targetId, targetType)) {
 				this.showToast({
 					id: String(Date.now()),
-					message: `"${movie.title}" is already in your watchlist`,
+					message: `"${targetTitle}" is already in your watchlist`,
 					type: 'info',
-					movieTitle: movie.title
+					movieTitle: targetTitle
 				});
 				return false;
 			}
 
-			const newItem = movieToWatchlistItem(movie);
+			let newItem: WatchlistItem;
+			if ('savedAt' in target && typeof target.savedAt === 'number') {
+				newItem = { ...(target as WatchlistItem), mediaType: targetType };
+			} else if (targetType === 'tv') {
+				newItem = tvShowToWatchlistItem(target as TVShow | TVDetail);
+			} else {
+				newItem = movieToWatchlistItem(target as Movie | MovieDetail);
+			}
+
 			this.items = [newItem, ...this.items];
 			const persisted = this.persist();
 
 			if (persisted) {
 				this.showToast({
 					id: String(Date.now()),
-					message: `Added "${movie.title}" to your watchlist`,
+					message: `Added "${targetTitle}" to your watchlist`,
 					type: 'success',
-					movieTitle: movie.title
+					movieTitle: targetTitle
 				});
 			}
 			return persisted;
 		});
 	}
 
-	remove(movieId: string | number): boolean {
+	remove(
+		target: string | number | { id: string | number; mediaType?: WatchlistMediaType },
+		mediaType?: WatchlistMediaType
+	): boolean {
 		return untrack(() => {
-			const targetId = String(movieId);
-			const existing = this.items.find((item) => item.id === targetId);
+			const targetId =
+				typeof target === 'object' && target !== null ? String(target.id) : String(target);
+			const targetType: WatchlistMediaType =
+				mediaType ??
+				(typeof target === 'object' &&
+				target !== null &&
+				'mediaType' in target &&
+				target.mediaType === 'tv'
+					? 'tv'
+					: 'movie');
+
+			const existing = this.items.find(
+				(item) => item.id === targetId && item.mediaType === targetType
+			);
 			if (!existing) return false;
 
-			this.items = this.items.filter((item) => item.id !== targetId);
+			this.items = this.items.filter(
+				(item) => !(item.id === targetId && item.mediaType === targetType)
+			);
 			const persisted = this.persist();
 
 			if (persisted) {
@@ -278,12 +383,22 @@ export class WatchlistState {
 		});
 	}
 
-	toggle(movie: Movie | MovieDetail): boolean {
-		if (this.has(movie.id)) {
-			this.remove(movie.id);
+	toggle(
+		target: Movie | MovieDetail | TVShow | TVDetail | PersonCreditTV | WatchlistItem,
+		mediaType?: WatchlistMediaType
+	): boolean {
+		const targetId = String(target.id);
+		const targetType: WatchlistMediaType =
+			mediaType ??
+			('mediaType' in target && target.mediaType === 'tv'
+				? 'tv'
+				: 'movie');
+
+		if (this.has(targetId, targetType)) {
+			this.remove(targetId, targetType);
 			return false;
 		} else {
-			this.add(movie);
+			this.add(target, targetType);
 			return true;
 		}
 	}
@@ -308,12 +423,28 @@ export class WatchlistState {
 		return this.items.length;
 	}
 
+	get movieCount(): number {
+		return this.items.filter((item) => item.mediaType === 'movie').length;
+	}
+
+	get tvCount(): number {
+		return this.items.filter((item) => item.mediaType === 'tv').length;
+	}
+
 	get movies(): Movie[] {
-		return this.items.map(watchlistItemToMovie);
+		return this.items
+			.filter((item) => item.mediaType === 'movie')
+			.map(watchlistItemToMovie);
+	}
+
+	get tvShows(): TVShow[] {
+		return this.items
+			.filter((item) => item.mediaType === 'tv')
+			.map(watchlistItemToTVShow);
 	}
 
 	getSortedMovies(sortBy: WatchlistSortOption): Movie[] {
-		const copy = [...this.items];
+		const copy = this.items.filter((item) => item.mediaType === 'movie');
 
 		switch (sortBy) {
 			case 'date_added_desc':
@@ -334,6 +465,36 @@ export class WatchlistState {
 		}
 
 		return copy.map(watchlistItemToMovie);
+	}
+
+	getSortedItems(
+		sortBy: WatchlistSortOption,
+		filterType: WatchlistContentTypeFilter = 'all'
+	): WatchlistItem[] {
+		let copy = [...this.items];
+		if (filterType !== 'all') {
+			copy = copy.filter((item) => item.mediaType === filterType);
+		}
+
+		switch (sortBy) {
+			case 'date_added_desc':
+				copy.sort((a, b) => b.savedAt - a.savedAt);
+				break;
+			case 'date_added_asc':
+				copy.sort((a, b) => a.savedAt - b.savedAt);
+				break;
+			case 'rating_desc':
+				copy.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+				break;
+			case 'year_desc':
+				copy.sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0));
+				break;
+			case 'title_asc':
+				copy.sort((a, b) => a.title.localeCompare(b.title));
+				break;
+		}
+
+		return copy;
 	}
 
 	showToast(toast: ToastMessage) {

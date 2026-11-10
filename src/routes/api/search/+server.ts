@@ -3,16 +3,22 @@ import type { RequestHandler } from './$types';
 import {
 	unifiedSearch,
 	searchMovies,
+	searchTV,
 	searchPeople,
 	mapTMDBMovieToMovie,
+	mapTMDBTVToTVShow,
 	mapTMDBPersonSearchResult
 } from '#lib/server/tmdb';
 import { generateDiscoverySuggestions, interpretQuery } from '#lib/search-query';
+import type { SearchContentType } from '#lib/types/search';
 
 export const GET: RequestHandler = async ({ url, fetch }) => {
 	const query = (url.searchParams.get('query') || url.searchParams.get('q') || '').trim();
 	const pageParam = parseInt(url.searchParams.get('page') || '1', 10);
 	const page = Math.max(1, Math.min(500, isNaN(pageParam) ? 1 : pageParam));
+	const contentType = (url.searchParams.get('type') ||
+		url.searchParams.get('contentType') ||
+		'all') as SearchContentType;
 
 	const isSuggest =
 		url.searchParams.get('suggest') === 'true' || url.searchParams.get('type') === 'suggest';
@@ -38,14 +44,16 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			return json({
 				query: '',
 				movies: [],
+				tvShows: [],
 				people: [],
 				discovery: []
 			});
 		}
 
 		try {
-			const [movieRes, personRes] = await Promise.allSettled([
+			const [movieRes, tvRes, personRes] = await Promise.allSettled([
 				searchMovies({ query, page: 1 }, fetch),
+				searchTV({ query, page: 1 }, fetch),
 				searchPeople({ query, page: 1 }, fetch)
 			]);
 
@@ -63,6 +71,20 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 						})
 					: [];
 
+			const tvShows =
+				tvRes.status === 'fulfilled'
+					? (tvRes.value.results || []).slice(0, 5).map((t) => {
+							const show = mapTMDBTVToTVShow(t);
+							return {
+								id: show.id,
+								name: show.name,
+								firstAirYear: show.firstAirYear,
+								rating: show.rating,
+								posterUrl: show.posterUrl
+							};
+						})
+					: [];
+
 			const people =
 				personRes.status === 'fulfilled'
 					? (personRes.value.results || []).slice(0, 3).map(mapTMDBPersonSearchResult)
@@ -74,6 +96,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 				{
 					query,
 					movies,
+					tvShows,
 					people,
 					discovery
 				},
@@ -91,6 +114,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			return json({
 				query,
 				movies: [],
+				tvShows: [],
 				people: [],
 				discovery: generateDiscoverySuggestions(query)
 			});
@@ -103,6 +127,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		return json({
 			results: [],
 			movies: [],
+			tvShows: [],
 			people: [],
 			companies: [],
 			activeFilters: [],
@@ -117,6 +142,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		const searchResult = await unifiedSearch(
 			{
 				query,
+				contentType,
 				genre,
 				year,
 				minRating,
@@ -131,9 +157,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 
 		return json(
 			{
-				// Backward-compatible 'results' field mapped to movies for existing API consumers
-				results: searchResult.movies,
+				// Backward-compatible 'results' field mapped to movies/tv for existing API consumers
+				results: contentType === 'tv' ? searchResult.tvShows : searchResult.movies,
 				movies: searchResult.movies,
+				tvShows: searchResult.tvShows,
 				people: searchResult.people,
 				companies: searchResult.companies,
 				activeFilters: searchResult.activeFilters,
@@ -155,6 +182,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 				error: 'Unable to perform movie search at this time. Please try again later.',
 				results: [],
 				movies: [],
+				tvShows: [],
 				people: [],
 				companies: [],
 				activeFilters: [],

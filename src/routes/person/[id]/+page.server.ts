@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import {
 	getPersonDetails,
 	getPersonMovieCredits,
+	getPersonTVCredits,
 	mapTMDBPersonToProfile,
 	TMDBError
 } from '#lib/server/tmdb';
@@ -25,10 +26,11 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 		'cache-control': 'public, max-age=180, s-maxage=300'
 	});
 
-	// Concurrently fetch person details and credits
-	const [personResult, creditsResult] = await Promise.allSettled([
+	// Concurrently fetch person details, movie credits, and TV credits
+	const [personResult, movieCreditsResult, tvCreditsResult] = await Promise.allSettled([
 		getPersonDetails(personId, fetch),
-		getPersonMovieCredits(personId, fetch)
+		getPersonMovieCredits(personId, fetch),
+		getPersonTVCredits(personId, fetch)
 	]);
 
 	// Primary person details handling
@@ -42,11 +44,16 @@ export const load: PageServerLoad = async ({ params, fetch, setHeaders }) => {
 	}
 
 	const rawPerson = personResult.value;
-	const creditsData = creditsResult.status === 'fulfilled' ? creditsResult.value : null;
+	const movieCreditsData =
+		movieCreditsResult.status === 'fulfilled' ? movieCreditsResult.value : null;
+	const tvCreditsData =
+		tvCreditsResult.status === 'fulfilled' ? tvCreditsResult.value : null;
 	const creditsError =
-		creditsResult.status === 'rejected' ? 'Filmography could not be retrieved at this time.' : null;
+		movieCreditsResult.status === 'rejected' || tvCreditsResult.status === 'rejected'
+			? 'Filmography could not be retrieved at this time.'
+			: null;
 
-	const person = mapTMDBPersonToProfile(rawPerson, creditsData);
+	const person = mapTMDBPersonToProfile(rawPerson, movieCreditsData, tvCreditsData);
 
 	return {
 		person,

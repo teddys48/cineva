@@ -86,7 +86,7 @@ export interface TMDBCompanyDetails {
 	description?: string;
 	headquarters?: string;
 	homepage?: string;
-	logo_path?: string | null;
+	logo_path: string | null;
 	origin_country?: string;
 	parent_company?: { id: number; name: string; logo_path?: string | null } | null;
 }
@@ -118,7 +118,7 @@ export interface TMDBMovieDetails extends TMDBMovie {
 }
 
 /**
- * TMDB Raw Image Assets (/movie/{id}/images)
+ * TMDB Raw Image Assets (/movie/{id}/images or /tv/{id}/images)
  */
 export interface TMDBImageItem {
 	aspect_ratio: number;
@@ -162,7 +162,9 @@ export type TMDBSortOption =
 	| 'vote_average.desc'
 	| 'vote_average.asc'
 	| 'primary_release_date.desc'
-	| 'primary_release_date.asc';
+	| 'primary_release_date.asc'
+	| 'first_air_date.desc'
+	| 'first_air_date.asc';
 
 export interface SearchMoviesOptions {
 	query: string;
@@ -195,6 +197,7 @@ export interface DiscoverMoviesOptions {
 }
 
 export interface ExploreFilters {
+	contentType?: 'movie' | 'tv';
 	genre?: string;
 	year?: number;
 	minRating?: number;
@@ -232,7 +235,7 @@ export interface TMDBPersonSearchResult {
 	adult?: boolean;
 	popularity?: number;
 	known_for_department?: string;
-	known_for?: TMDBMovie[];
+	known_for?: (TMDBMovie | TMDBTVShow)[];
 }
 
 export interface TMDBCompanySearchResult {
@@ -247,16 +250,21 @@ export interface TMDBMultiSearchResultItem {
 	media_type: 'movie' | 'person' | 'tv';
 	title?: string;
 	name?: string;
+	original_title?: string;
+	original_name?: string;
 	poster_path?: string | null;
 	profile_path?: string | null;
 	backdrop_path?: string | null;
 	release_date?: string;
+	first_air_date?: string;
 	vote_average?: number;
 	vote_count?: number;
 	overview?: string;
 	genre_ids?: number[];
+	origin_country?: string[];
+	original_language?: string;
 	known_for_department?: string;
-	known_for?: TMDBMovie[];
+	known_for?: (TMDBMovie | TMDBTVShow)[];
 	popularity?: number;
 }
 
@@ -298,4 +306,178 @@ export interface TMDBPersonMovieCredits {
 	id: number;
 	cast: TMDBPersonCastCredit[];
 	crew: TMDBPersonCrewCredit[];
+}
+
+/**
+ * Raw TMDB TV Series Types
+ */
+export interface TMDBTVShow {
+	id: number;
+	name: string;
+	original_name?: string;
+	overview: string;
+	poster_path: string | null;
+	backdrop_path: string | null;
+	first_air_date?: string;
+	last_air_date?: string;
+	vote_average: number;
+	vote_count: number;
+	genre_ids?: number[];
+	genres?: Array<{ id: number; name: string }>;
+	popularity?: number;
+	adult?: boolean;
+	original_language?: string;
+	origin_country?: string[];
+	tagline?: string;
+	status?: string;
+	number_of_seasons?: number;
+	number_of_episodes?: number;
+	episode_run_time?: number[];
+}
+
+export interface TMDBTVSeasonSummary {
+	id: number;
+	air_date?: string | null;
+	episode_count?: number;
+	name: string;
+	overview?: string;
+	poster_path: string | null;
+	season_number: number;
+	vote_average?: number;
+}
+
+export interface TMDBTVNetwork {
+	id: number;
+	name: string;
+	logo_path?: string | null;
+	origin_country?: string;
+}
+
+export interface TMDBTVCreator {
+	id: number;
+	credit_id?: string;
+	name: string;
+	gender?: number;
+	profile_path?: string | null;
+}
+
+export interface TMDBTVShowDetails extends TMDBTVShow {
+	created_by?: TMDBTVCreator[];
+	networks?: TMDBTVNetwork[];
+	seasons?: TMDBTVSeasonSummary[];
+	production_companies?: TMDBProductionCompany[];
+	production_countries?: TMDBProductionCountry[];
+	spoken_languages?: TMDBSpokenLanguage[];
+	homepage?: string | null;
+	credits?: {
+		cast: TMDBCastMember[];
+		crew: TMDBCrewMember[];
+	};
+}
+
+export interface TMDBTVEpisode {
+	id: number;
+	name: string;
+	overview: string;
+	vote_average?: number;
+	vote_count?: number;
+	air_date?: string | null;
+	episode_number: number;
+	season_number: number;
+	runtime?: number | null;
+	still_path?: string | null;
+	guest_stars?: TMDBCastMember[];
+	crew?: TMDBCrewMember[];
+}
+
+export interface TMDBTVSeasonResponse {
+	_id?: string;
+	id: number;
+	air_date?: string | null;
+	name: string;
+	overview: string;
+	poster_path: string | null;
+	season_number: number;
+	episodes: TMDBTVEpisode[];
+}
+
+export interface TMDBTVContentRatingItem {
+	descriptors?: string[];
+	iso_3166_1: string;
+	rating: string;
+}
+
+export interface TMDBTVContentRatingsResponse {
+	id: number;
+	results: TMDBTVContentRatingItem[];
+}
+
+export interface SearchTVOptions {
+	query: string;
+	page?: number;
+	language?: string;
+	first_air_date_year?: number;
+	include_adult?: boolean;
+}
+
+export interface DiscoverTVOptions {
+	page?: number;
+	with_genres?: string | number;
+	with_companies?: string | number;
+	with_origin_country?: string;
+	with_original_language?: string;
+	first_air_date_year?: number;
+	'first_air_date.gte'?: string;
+	'first_air_date.lte'?: string;
+	min_rating?: number;
+	'vote_average.gte'?: number;
+	'vote_count.gte'?: number;
+	sort_by?: string;
+	language?: string;
+	include_adult?: boolean;
+}
+
+export interface TMDBPersonTVCastCredit {
+	id: number;
+	name?: string;
+	original_name?: string;
+	character?: string;
+	poster_path?: string | null;
+	backdrop_path?: string | null;
+	first_air_date?: string;
+	vote_average?: number;
+	vote_count?: number;
+	overview?: string;
+	genre_ids?: number[];
+	popularity?: number;
+	adult?: boolean;
+	episode_count?: number;
+	origin_country?: string[];
+	original_language?: string;
+}
+
+export interface TMDBPersonTVCrewCredit {
+	id: number;
+	name?: string;
+	original_name?: string;
+	job: string;
+	department?: string;
+	poster_path?: string | null;
+	backdrop_path?: string | null;
+	first_air_date?: string;
+	vote_average?: number;
+	vote_count?: number;
+	overview?: string;
+	genre_ids?: number[];
+	popularity?: number;
+	adult?: boolean;
+	episode_count?: number;
+	origin_country?: string[];
+	original_language?: string;
+}
+
+export interface TMDBPersonTVCredits {
+	id: number;
+	cast: TMDBPersonTVCastCredit[];
+	crew: TMDBPersonTVCrewCredit[];
 }

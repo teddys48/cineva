@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import type { PageProps } from './$types';
-	import type { PersonCreditMovie } from '#lib/types/person';
+	import type { PersonCreditMovie, PersonCreditTV } from '#lib/types/person';
 	import MovieCard from '#lib/components/movie/MovieCard.svelte';
+	import TVCard from '#lib/components/tv/TVCard.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
 	import SectionError from '#lib/components/ui/SectionError.svelte';
 	import {
@@ -11,6 +12,7 @@
 		Calendar,
 		MapPin,
 		Film,
+		Tv,
 		ExternalLink,
 		Clapperboard,
 		Sparkles,
@@ -37,68 +39,105 @@
 	);
 
 	type RoleCategory = 'acting' | 'directing' | 'writing' | 'producing' | 'cinematography' | 'other';
+	type MediaType = 'movie' | 'tv';
+
+	let userSelectedMediaType = $state<MediaType | null>(null);
+
+	let activeMediaType = $derived.by<MediaType>(() => {
+		if (userSelectedMediaType) return userSelectedMediaType;
+		const movieCount = person.movieCreditsCount ?? person.actingCredits?.length ?? 0;
+		const tvCount = person.tvCreditsCount ?? 0;
+		if (movieCount === 0 && tvCount > 0) return 'tv';
+		return 'movie';
+	});
 
 	interface RoleTab {
 		id: RoleCategory;
 		label: string;
 		count: number;
-		credits: PersonCreditMovie[];
+		credits: (PersonCreditMovie | PersonCreditTV)[];
 		icon: typeof User;
 		defaultSubtitle: string;
 	}
+
+	let movieCreditsGroup = $derived(
+		person.movieCredits || {
+			acting: person.actingCredits || [],
+			directing: person.directingCredits || [],
+			writing: person.writingCredits || [],
+			producing: person.producingCredits || [],
+			cinematography: person.cinematographyCredits || [],
+			other: person.otherCrewCredits || [],
+			totalCount: person.movieCreditsCount || 0
+		}
+	);
+
+	let tvCreditsGroup = $derived(
+		person.tvCredits || {
+			acting: [],
+			directing: [],
+			writing: [],
+			producing: [],
+			cinematography: [],
+			other: [],
+			totalCount: person.tvCreditsCount || 0
+		}
+	);
+
+	let currentGroup = $derived(activeMediaType === 'tv' ? tvCreditsGroup : movieCreditsGroup);
 
 	let roleTabs = $derived<RoleTab[]>([
 		{
 			id: 'acting',
 			label: 'Acting',
-			count: person.actingCredits?.length || 0,
-			credits: person.actingCredits || [],
+			count: currentGroup.acting.length,
+			credits: currentGroup.acting,
 			icon: User,
 			defaultSubtitle: 'Cast'
 		},
 		{
 			id: 'directing',
 			label: 'Directing',
-			count: person.directingCredits?.length || 0,
-			credits: person.directingCredits || [],
+			count: currentGroup.directing.length,
+			credits: currentGroup.directing,
 			icon: Clapperboard,
 			defaultSubtitle: 'Director'
 		},
 		{
 			id: 'writing',
 			label: 'Writing',
-			count: person.writingCredits?.length || 0,
-			credits: person.writingCredits || [],
+			count: currentGroup.writing.length,
+			credits: currentGroup.writing,
 			icon: PenTool,
 			defaultSubtitle: 'Screenplay / Writer'
 		},
 		{
 			id: 'producing',
 			label: 'Producing',
-			count: person.producingCredits?.length || 0,
-			credits: person.producingCredits || [],
+			count: currentGroup.producing.length,
+			credits: currentGroup.producing,
 			icon: Award,
 			defaultSubtitle: 'Producer'
 		},
 		{
 			id: 'cinematography',
 			label: 'Cinematography',
-			count: person.cinematographyCredits?.length || 0,
-			credits: person.cinematographyCredits || [],
+			count: currentGroup.cinematography.length,
+			credits: currentGroup.cinematography,
 			icon: Video,
 			defaultSubtitle: 'Cinematographer'
 		},
 		{
 			id: 'other',
 			label: 'Other Crew',
-			count: person.otherCrewCredits?.length || 0,
-			credits: person.otherCrewCredits || [],
+			count: currentGroup.other.length,
+			credits: currentGroup.other,
 			icon: Film,
 			defaultSubtitle: 'Crew'
 		}
 	]);
 
-	// Filter available roles with at least 1 credit
+	// Filter available roles with at least 1 credit in the current media type
 	let availableRoles = $derived(roleTabs.filter((r) => r.count > 0));
 
 	// Active filmography category tab
@@ -112,15 +151,15 @@
 			return userSelectedCategory;
 		}
 		const dept = (person.knownForDepartment || '').toLowerCase();
-		if (dept.includes('direct') && (person.directingCredits?.length ?? 0) > 0) return 'directing';
-		if (dept.includes('writ') && (person.writingCredits?.length ?? 0) > 0) return 'writing';
-		if (dept.includes('produc') && (person.producingCredits?.length ?? 0) > 0) return 'producing';
+		if (dept.includes('direct') && currentGroup.directing.length > 0) return 'directing';
+		if (dept.includes('writ') && currentGroup.writing.length > 0) return 'writing';
+		if (dept.includes('produc') && currentGroup.producing.length > 0) return 'producing';
 		if (
 			(dept.includes('camera') || dept.includes('cinemat')) &&
-			(person.cinematographyCredits?.length ?? 0) > 0
+			currentGroup.cinematography.length > 0
 		)
 			return 'cinematography';
-		if ((person.actingCredits?.length ?? 0) > 0) return 'acting';
+		if (currentGroup.acting.length > 0) return 'acting';
 		if (availableRoles.length > 0) return availableRoles[0].id;
 		return 'acting';
 	});
@@ -137,7 +176,12 @@
 		showAllCredits ? currentCredits : currentCredits.slice(0, INITIAL_CREDITS_LIMIT)
 	);
 
-	// Reset showAllCredits when category changes
+	function selectMediaType(type: MediaType) {
+		userSelectedMediaType = type;
+		userSelectedCategory = null;
+		showAllCredits = false;
+	}
+
 	function selectCategory(category: RoleCategory) {
 		userSelectedCategory = category;
 		showAllCredits = false;
@@ -171,7 +215,7 @@
 	<meta name="twitter:title" content="{person.name} — Profile & Filmography — Cineva" />
 	<meta name="twitter:description" content={metaDescription} />
 	{#if person.profileUrl}
-		<meta name="twitter:image" content={person.profileUrl} />
+		<meta property="twitter:image" content={person.profileUrl} />
 	{/if}
 </svelte:head>
 
@@ -357,8 +401,8 @@
 
 	<!-- Main Content: Filmography Section -->
 	<div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-		<!-- Section Header with Category Tabs -->
-		<div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+		<!-- Section Header with Media Format Toggle -->
+		<div class="mb-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<h2 class="font-['Space_Grotesk'] text-2xl font-bold text-cinema-text sm:text-3xl">
 					Filmography
@@ -368,13 +412,49 @@
 				</p>
 			</div>
 
-			<!-- Role Category Filter Tabs -->
+			<!-- Media Format Tabs (Movies vs TV Shows) -->
 			<div
-				class="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-cinema-border bg-cinema-surface p-1.5 shadow-xs"
+				class="inline-flex items-center rounded-xl border border-cinema-border bg-cinema-surface p-1 shadow-xs"
+				role="tablist"
+				aria-label="Media format"
+			>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={activeMediaType === 'movie'}
+					onclick={() => selectMediaType('movie')}
+					class="inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all {activeMediaType ===
+					'movie'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+						: 'text-cinema-text-muted hover:text-cinema-text'}"
+				>
+					<Film class="h-3.5 w-3.5" />
+					<span>Movies ({person.movieCreditsCount ?? person.actingCredits?.length ?? 0})</span>
+				</button>
+				<button
+					type="button"
+					role="tab"
+					aria-selected={activeMediaType === 'tv'}
+					onclick={() => selectMediaType('tv')}
+					class="inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all {activeMediaType ===
+					'tv'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+						: 'text-cinema-text-muted hover:text-cinema-text'}"
+				>
+					<Tv class="h-3.5 w-3.5" />
+					<span>TV Shows ({person.tvCreditsCount ?? 0})</span>
+				</button>
+			</div>
+		</div>
+
+		<!-- Role Category Filter Tabs -->
+		{#if availableRoles.length > 0}
+			<div
+				class="mb-8 inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-cinema-border bg-cinema-surface p-1.5 shadow-xs"
 				role="tablist"
 				aria-label="Filmography Categories"
 			>
-				{#each availableRoles.length > 0 ? availableRoles : roleTabs.slice(0, 2) as tab (tab.id)}
+				{#each availableRoles as tab (tab.id)}
 					{@const IconComponent = tab.icon}
 					<button
 						type="button"
@@ -391,7 +471,7 @@
 					</button>
 				{/each}
 			</div>
-		</div>
+		{/if}
 
 		<!-- Partial Failure Error -->
 		{#if creditsError}
@@ -404,14 +484,25 @@
 		{#if currentCredits.length > 0}
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-4">
 				{#each visibleCredits as credit (credit.id)}
-					<MovieCard
-						movie={credit}
-						subtitle={activeCategory === 'acting'
-							? credit.character
-								? `as ${credit.character}`
-								: 'Cast'
-							: credit.job || currentTab.defaultSubtitle}
-					/>
+					{#if activeMediaType === 'tv'}
+						<TVCard
+							show={credit as PersonCreditTV}
+							subtitle={activeCategory === 'acting'
+								? credit.character
+									? `as ${credit.character}`
+									: 'Cast'
+								: credit.job || currentTab.defaultSubtitle}
+						/>
+					{:else}
+						<MovieCard
+							movie={credit as PersonCreditMovie}
+							subtitle={activeCategory === 'acting'
+								? credit.character
+									? `as ${credit.character}`
+									: 'Cast'
+								: credit.job || currentTab.defaultSubtitle}
+						/>
+					{/if}
 				{/each}
 			</div>
 
@@ -434,8 +525,8 @@
 		{:else}
 			<!-- Empty State for Current Category -->
 			<EmptyState
-				title="No {currentTab.label} Credits Found"
-				description="There are currently no {currentTab.label.toLowerCase()} credits cataloged for {person.name}."
+				title="No {currentTab.label} {activeMediaType === 'tv' ? 'TV' : 'Movie'} Credits Found"
+				description="There are currently no {currentTab.label.toLowerCase()} {activeMediaType === 'tv' ? 'TV series' : 'movie'} credits cataloged for {person.name}."
 			/>
 		{/if}
 	</div>

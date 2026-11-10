@@ -1,6 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { untrack } from 'svelte';
 import type { Movie, MovieDetail } from './types/movie';
+import type { TVShow, TVDetail } from './types/tv';
 
 export const RECENTLY_VIEWED_KEY = 'cineva:recently_viewed';
 export const LEGACY_RECENTLY_VIEWED_KEY = 'scenora:recently_viewed';
@@ -236,20 +237,23 @@ export class PersonalizationState {
 		}
 	}
 
-	addRecentlyViewed(movie: Movie | MovieDetail) {
+	addRecentlyViewed(media: Movie | MovieDetail | TVShow | TVDetail) {
 		untrack(() => {
-			const id = String(movie.id);
+			const id = String(media.id);
 			const filtered = this.recentlyViewed.filter((item) => item.id !== id);
+			const title = 'title' in media && media.title ? media.title : 'name' in media ? media.name : 'Untitled';
+			const releaseYear = 'releaseYear' in media ? media.releaseYear : 'firstAirYear' in media ? media.firstAirYear : null;
+			const runtime = 'runtime' in media ? media.runtime : 'episodeRuntime' in media ? media.episodeRuntime : undefined;
 
 			const newItem: RecentlyViewedItem = {
 				id,
-				title: movie.title,
-				posterUrl: movie.posterUrl || '',
-				backdropUrl: movie.backdropUrl || '',
-				releaseYear: movie.releaseYear ?? null,
-				rating: movie.rating ?? null,
-				genres: movie.genres ? movie.genres.slice(0, 3) : [],
-				runtime: movie.runtime,
+				title,
+				posterUrl: media.posterUrl || '',
+				backdropUrl: media.backdropUrl || '',
+				releaseYear: releaseYear ?? null,
+				rating: media.rating ?? null,
+				genres: media.genres ? media.genres.slice(0, 3) : [],
+				runtime,
 				viewedAt: Date.now()
 			};
 

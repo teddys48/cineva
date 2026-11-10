@@ -1,26 +1,38 @@
 <script lang="ts">
 	import type { Movie, MovieDetail } from '#lib/types/movie';
+	import type { TVShow, TVDetail } from '#lib/types/tv';
+	import type { PersonCreditTV } from '#lib/types/person';
 	import { watchlistState } from '#lib/watchlist.svelte';
 	import { Bookmark, Check } from 'lucide-svelte';
 
 	interface Props {
-		movie: Movie | MovieDetail;
+		item?: Movie | MovieDetail | TVShow | TVDetail | PersonCreditTV;
+		movie?: Movie | MovieDetail | TVShow | TVDetail | PersonCreditTV; // backward compat
 		variant?: 'icon' | 'button';
 		class?: string;
 	}
 
-	let { movie, variant = 'icon', class: className = '' }: Props = $props();
+	let { item, movie, variant = 'icon', class: className = '' }: Props = $props();
 
-	let isSaved = $derived(watchlistState.has(movie.id));
+	const target = $derived(item || movie!);
+	const mediaType = $derived(
+		(target && 'mediaType' in target && target.mediaType) ? target.mediaType : 'movie'
+	);
+	const targetTitle = $derived(
+		target ? ('name' in target && target.name ? target.name : target.title) : ''
+	);
+
+	let isSaved = $derived(target ? watchlistState.has(target.id, mediaType) : false);
 
 	const ariaLabel = $derived(
-		isSaved ? `Remove ${movie.title} from Watchlist` : `Add ${movie.title} to Watchlist`
+		isSaved ? `Remove ${targetTitle} from Watchlist` : `Add ${targetTitle} to Watchlist`
 	);
 
 	function handleClick(e: MouseEvent) {
 		e.preventDefault();
 		e.stopPropagation();
-		watchlistState.toggle(movie);
+		if (!target) return;
+		watchlistState.toggle(target, mediaType);
 	}
 </script>
 
@@ -49,19 +61,17 @@
 	<button
 		type="button"
 		onclick={handleClick}
-		class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-cinema-border bg-cinema-surface px-5 text-sm font-medium text-cinema-text shadow-xs transition-all duration-200 hover:border-cinema-accent/40 hover:bg-cinema-elevated focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none active:scale-[0.98] {isSaved
-			? 'border-cinema-accent/40 bg-cinema-elevated text-cinema-accent'
-			: ''} {className}"
+		class="inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-cinema-accent focus-visible:outline-none active:scale-[0.98] {isSaved
+			? 'border-cinema-accent/50 bg-cinema-accent/15 text-cinema-accent hover:border-cinema-accent hover:bg-cinema-accent/25'
+			: 'border-cinema-border bg-cinema-surface text-cinema-text shadow-sm hover:border-cinema-accent/50 hover:bg-cinema-elevated'} {className}"
 		aria-label={ariaLabel}
 		aria-pressed={isSaved}
 	>
 		{#if isSaved}
 			<Check class="h-4 w-4 text-cinema-accent" />
-			<span class="font-semibold text-cinema-accent">In Watchlist</span>
+			<span>In Watchlist</span>
 		{:else}
-			<Bookmark
-				class="h-4 w-4 text-cinema-text-muted transition-colors group-hover:text-cinema-accent"
-			/>
+			<Bookmark class="h-4 w-4" />
 			<span>Add to Watchlist</span>
 		{/if}
 	</button>

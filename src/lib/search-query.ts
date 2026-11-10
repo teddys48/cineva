@@ -87,7 +87,19 @@ export const GENRE_ALIASES: Record<string, number> = {
 	military: 10752,
 	western: 37,
 	westerns: 37,
-	cowboy: 37
+	cowboy: 37,
+	reality: 10764,
+	"reality tv": 10764,
+	soap: 10766,
+	"soap opera": 10766,
+	talk: 10767,
+	"talk show": 10767,
+	"action & adventure": 10759,
+	"action and adventure": 10759,
+	"sci-fi & fantasy": 10765,
+	"science fiction & fantasy": 10765,
+	"war & politics": 10768,
+	"war and politics": 10768
 };
 
 /**
@@ -335,43 +347,40 @@ export function interpretQuery(raw: string): QueryInterpretation {
 		}
 	}
 
-	// 6. Check combined language + genre: e.g. "Japanese animation", "French drama", "Korean thriller"
+	// 6. Check combined language/country + genre(s): e.g. "Japanese animation", "French drama", "Korean drama", "Japanese romance drama"
 	const words = rawQuery.split(/\s+/);
-	if (words.length === 2) {
+	if (words.length >= 2) {
 		const langResolved = resolveLanguage(words[0]);
-		const genreResolved = resolveGenre(words[1]);
-		if (langResolved && genreResolved) {
-			return {
-				rawQuery,
-				isYearOnly: false,
-				language: langResolved,
-				genre: genreResolved,
-				isMetadataDiscovery: true,
-				discoveryFilters: {
-					languageCode: langResolved.code,
-					languageName: langResolved.name,
-					genreId: genreResolved.id,
-					genreName: genreResolved.name
-				}
-			};
-		}
-
-		// Also check country + genre: e.g. "Japan animation", "Korea drama"
 		const countryResolved = resolveCountry(words[0]);
-		if (countryResolved && genreResolved) {
-			return {
-				rawQuery,
-				isYearOnly: false,
-				country: countryResolved,
-				genre: genreResolved,
+
+		if (langResolved || countryResolved) {
+			const remainingWords = words.slice(1).join(" ");
+			let genreResolved = resolveGenre(remainingWords);
+			if (!genreResolved) {
+				for (let i = 1; i < words.length; i++) {
+					genreResolved = resolveGenre(words[i]);
+					if (genreResolved) break;
+				}
+			}
+
+			if (genreResolved) {
+				return {
+					rawQuery,
+					isYearOnly: false,
+					language: langResolved ?? undefined,
+					country: countryResolved ?? undefined,
+					genre: genreResolved,
 				isMetadataDiscovery: true,
 				discoveryFilters: {
-					countryCode: countryResolved.code,
-					countryName: countryResolved.name,
+					languageCode: langResolved?.code,
+					languageName: langResolved?.name,
+					countryCode: countryResolved?.code,
+					countryName: countryResolved?.name,
 					genreId: genreResolved.id,
 					genreName: genreResolved.name
 				}
 			};
+			}
 		}
 	}
 

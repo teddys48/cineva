@@ -3,10 +3,12 @@
 		SearchSuggestionsResponse,
 		DiscoveryFilterSuggestion,
 		SearchPerson,
-		SuggestionMovieItem
+		SuggestionMovieItem,
+		SuggestionTVItem
 	} from '#lib/types/search';
 	import {
 		Film,
+		Tv,
 		User,
 		Sparkles,
 		Star,
@@ -19,7 +21,8 @@
 	export type UnifiedSuggestion =
 		| { kind: 'discovery'; item: DiscoveryFilterSuggestion }
 		| { kind: 'person'; item: SearchPerson }
-		| { kind: 'movie'; item: SuggestionMovieItem };
+		| { kind: 'movie'; item: SuggestionMovieItem }
+		| { kind: 'tv'; item: SuggestionTVItem };
 
 	let {
 		suggestions,
@@ -38,6 +41,7 @@
 	let hasResults = $derived(
 		(suggestions.discovery?.length ?? 0) > 0 ||
 			(suggestions.people?.length ?? 0) > 0 ||
+			(suggestions.tvShows?.length ?? 0) > 0 ||
 			(suggestions.movies?.length ?? 0) > 0
 	);
 </script>
@@ -173,7 +177,80 @@
 			</div>
 		{/if}
 
-		<!-- Category 3: Movies -->
+		<!-- Category 3: TV Shows -->
+		{#if suggestions.tvShows && suggestions.tvShows.length > 0}
+			<div class="border-b border-cinema-border/50 p-2">
+				<div
+					class="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold tracking-wider text-cinema-accent"
+				>
+					<Tv class="h-3 w-3" />
+					<span>TV SHOWS</span>
+				</div>
+				<div class="mt-1 flex flex-col gap-1">
+					{#each suggestions.tvShows as show, i (show.id)}
+						{@const globalIndex =
+							(suggestions.discovery?.length ?? 0) +
+							(suggestions.people?.length ?? 0) +
+							i}
+						{@const isSelected = activeIndex === globalIndex}
+						<button
+							type="button"
+							role="option"
+							aria-selected={isSelected}
+							id={`suggestion-item-${globalIndex}`}
+							onmousedown={() => onSelect({ kind: 'tv', item: show })}
+							class="group flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors {isSelected
+								? 'bg-cinema-elevated text-cinema-accent'
+								: 'text-cinema-text hover:bg-cinema-elevated/70'}"
+						>
+							<div class="flex items-center gap-3">
+								<div
+									class="h-10 w-7 shrink-0 overflow-hidden rounded border border-cinema-border bg-cinema-muted"
+								>
+									{#if show.posterUrl}
+										<img
+											src={show.posterUrl}
+											alt={show.name}
+											class="h-full w-full object-cover"
+										/>
+									{:else}
+										<div
+											class="flex h-full w-full items-center justify-center text-cinema-text-muted"
+										>
+											<Tv class="h-3.5 w-3.5" />
+										</div>
+									{/if}
+								</div>
+								<div class="min-w-0">
+									<div class="truncate text-sm font-medium group-hover:text-cinema-accent">
+										{show.name}
+									</div>
+									<div class="flex items-center gap-2 text-xs text-cinema-text-muted">
+										{#if show.firstAirYear}
+											<span class="flex items-center gap-0.5">
+												<Calendar class="h-3 w-3" />
+												<span>{show.firstAirYear}</span>
+											</span>
+										{/if}
+										{#if show.rating}
+											<span class="flex items-center gap-0.5 text-cinema-accent">
+												<Star class="h-3 w-3 fill-cinema-accent text-cinema-accent" />
+												<span>{show.rating}</span>
+											</span>
+										{/if}
+									</div>
+								</div>
+							</div>
+							<span class="text-xs text-cinema-text-muted group-hover:text-cinema-accent">
+								View →
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Category 4: Movies -->
 		{#if suggestions.movies && suggestions.movies.length > 0}
 			<div class="p-2">
 				<div
@@ -185,7 +262,10 @@
 				<div class="mt-1 flex flex-col gap-1">
 					{#each suggestions.movies as movie, i (movie.id)}
 						{@const globalIndex =
-							(suggestions.discovery?.length ?? 0) + (suggestions.people?.length ?? 0) + i}
+							(suggestions.discovery?.length ?? 0) +
+							(suggestions.people?.length ?? 0) +
+							(suggestions.tvShows?.length ?? 0) +
+							i}
 						{@const isSelected = activeIndex === globalIndex}
 						<button
 							type="button"

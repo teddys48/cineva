@@ -16,13 +16,26 @@ import type {
 	TMDBMovieImagesResponse,
 	TMDBImageItem,
 	TMDBPersonSearchResult,
-	TMDBCompanySearchResult
+	TMDBCompanySearchResult,
+	TMDBTVShow,
+	TMDBTVShowDetails,
+	TMDBTVSeasonSummary,
+	TMDBTVEpisode,
+	TMDBTVSeasonResponse,
+	TMDBTVContentRatingsResponse,
+	SearchTVOptions,
+	DiscoverTVOptions,
+	TMDBPersonTVCredits,
+	TMDBPersonTVCastCredit,
+	TMDBPersonTVCrewCredit,
+	TMDBMultiSearchResultItem
 } from '#lib/types/tmdb';
 import type {
 	SearchPerson,
 	SearchCompany,
 	UnifiedSearchOptions,
-	UnifiedSearchResult
+	UnifiedSearchResult,
+	SearchContentType
 } from '#lib/types/search';
 import {
 	interpretQuery,
@@ -47,10 +60,24 @@ import type {
 	MovieImageType,
 	MovieImagesGallery
 } from '#lib/types/movie';
+import type {
+	TVShow,
+	TVDetail,
+	TVSeasonSummary,
+	TVEpisode,
+	TVSeasonDetail,
+	TVNetworkInfo,
+	TVCreatorInfo
+} from '#lib/types/tv';
 import { getLogoUrl, getTMDBImageUrl } from '#lib/images';
 
 export { getLogoUrl, getTMDBImageUrl };
-import type { PersonProfile, PersonCreditMovie } from '#lib/types/person';
+import type {
+	PersonProfile,
+	PersonCreditMovie,
+	PersonCreditTV,
+	RoleCreditsGroup
+} from '#lib/types/person';
 
 interface PrivateEnv {
 	TMDB_ACCESS_TOKEN?: string;
@@ -94,7 +121,87 @@ export const TMDB_GENRES: Record<number, string> = {
 };
 
 /**
- * Valid TMDB discover sorting modes
+ * Standard TMDB TV genre dictionary (from GET /genre/tv/list)
+ */
+export const TMDB_TV_GENRES: Record<number, string> = {
+	10759: 'Action & Adventure',
+	16: 'Animation',
+	35: 'Comedy',
+	80: 'Crime',
+	99: 'Documentary',
+	18: 'Drama',
+	10751: 'Family',
+	10762: 'Kids',
+	9648: 'Mystery',
+	10763: 'News',
+	10764: 'Reality',
+	10765: 'Sci-Fi & Fantasy',
+	10766: 'Soap',
+	10767: 'Talk',
+	10768: 'War & Politics',
+	37: 'Western'
+};
+
+export const TV_GENRE_ALIASES: Record<string, number> = {
+	'action & adventure': 10759,
+	'action and adventure': 10759,
+	action: 10759,
+	adventure: 10759,
+	animation: 16,
+	anime: 16,
+	comedy: 35,
+	crime: 80,
+	documentary: 99,
+	doc: 99,
+	drama: 18,
+	family: 10751,
+	kids: 10762,
+	children: 10762,
+	mystery: 9648,
+	news: 10763,
+	reality: 10764,
+	'sci-fi & fantasy': 10765,
+	'sci-fi and fantasy': 10765,
+	'sci-fi': 10765,
+	scifi: 10765,
+	fantasy: 10765,
+	soap: 10766,
+	talk: 10767,
+	'war & politics': 10768,
+	'war and politics': 10768,
+	war: 10768,
+	politics: 10768,
+	western: 37
+};
+
+/**
+ * Resolves a TV genre by string name, alias, or numeric ID
+ */
+export function resolveTVGenre(genreInput: string | number): number | null {
+	if (typeof genreInput === 'number') {
+		if (TMDB_TV_GENRES[genreInput]) return genreInput;
+		if (genreInput === 28 || genreInput === 12) return 10759;
+		if (genreInput === 878 || genreInput === 14) return 10765;
+		return null;
+	}
+
+	const normalized = String(genreInput).trim().toLowerCase();
+	if (!normalized) return null;
+
+	const idFromAlias = TV_GENRE_ALIASES[normalized];
+	if (idFromAlias) return idFromAlias;
+
+	for (const [idStr, name] of Object.entries(TMDB_TV_GENRES)) {
+		if (name.toLowerCase() === normalized) {
+			return Number(idStr);
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Valid TMDB discover sorting modes for Movies
  */
 export const VALID_SORT_OPTIONS: TMDBSortOption[] = [
 	'popularity.desc',
@@ -103,6 +210,18 @@ export const VALID_SORT_OPTIONS: TMDBSortOption[] = [
 	'vote_average.asc',
 	'primary_release_date.desc',
 	'primary_release_date.asc'
+];
+
+/**
+ * Valid TMDB discover sorting modes for TV Shows
+ */
+export const VALID_TV_SORT_OPTIONS: TMDBSortOption[] = [
+	'popularity.desc',
+	'popularity.asc',
+	'vote_average.desc',
+	'vote_average.asc',
+	'first_air_date.desc',
+	'first_air_date.asc'
 ];
 
 /**
@@ -435,6 +554,64 @@ export function mapTMDBMovieToMovie(
 }
 
 /**
+ * Transform a raw TMDB TV show object into Cineva's TVShow model
+ */
+export function mapTMDBTVToTVShow(
+	tmdbShow: TMDBTVShow,
+	tvGenres?: Record<number, string>
+): TVShow {
+	const { year } = parseReleaseDate(tmdbShow.first_air_date);
+
+	let genreNames: string[] = [];
+	if (Array.isArray(tmdbShow.genres) && tmdbShow.genres.length > 0) {
+		genreNames = tmdbShow.genres.map((g) => g.name);
+	} else if (Array.isArray(tmdbShow.genre_ids)) {
+		const dict = tvGenres || TMDB_TV_GENRES;
+		genreNames = tmdbShow.genre_ids
+			.map((id) => dict[id])
+			.filter((name): name is string => Boolean(name));
+	}
+
+	const rating =
+		typeof tmdbShow.vote_average === 'number' &&
+		!Number.isNaN(tmdbShow.vote_average) &&
+		tmdbShow.vote_count > 0 &&
+		tmdbShow.vote_average > 0
+			? Number(tmdbShow.vote_average.toFixed(1))
+			: null;
+
+	const showName = tmdbShow.name || tmdbShow.original_name || 'Untitled Series';
+
+	return {
+		id: String(tmdbShow.id),
+		title: showName,
+		name: showName,
+		originalName:
+			tmdbShow.original_name && tmdbShow.original_name !== tmdbShow.name
+				? tmdbShow.original_name
+				: undefined,
+		tagline: tmdbShow.tagline || undefined,
+		overview: tmdbShow.overview || 'No synopsis available for this series.',
+		firstAirYear: year,
+		lastAirYear: tmdbShow.last_air_date ? parseReleaseDate(tmdbShow.last_air_date).year : undefined,
+		firstAirDate: tmdbShow.first_air_date || undefined,
+		lastAirDate: tmdbShow.last_air_date || undefined,
+		rating,
+		voteCount: tmdbShow.vote_count || 0,
+		genres: genreNames,
+		posterUrl: getPosterUrl(tmdbShow.poster_path, 'w500'),
+		backdropUrl: getBackdropUrl(tmdbShow.backdrop_path, 'w1280'),
+		originCountry: tmdbShow.origin_country || [],
+		originalLanguage: tmdbShow.original_language,
+		originalLanguageName: formatLanguageName(tmdbShow.original_language),
+		numberOfSeasons: tmdbShow.number_of_seasons,
+		numberOfEpisodes: tmdbShow.number_of_episodes,
+		status: tmdbShow.status,
+		mediaType: 'tv'
+	};
+}
+
+/**
  * Transform raw TMDB details, credits, and videos into Cineva's MovieDetail model
  */
 export function mapTMDBMovieDetailsToDetail(
@@ -694,6 +871,313 @@ export function mapTMDBMovieDetailsToDetail(
 }
 
 /**
+ * Transform raw TMDB TV details, credits, videos, and content ratings into Cineva's TVDetail model
+ */
+export function mapTMDBTVDetailsToDetail(
+	details: TMDBTVShowDetails,
+	credits?: TMDBCreditsResponse | null,
+	videos?: TMDBVideo[] | null,
+	contentRatings?: TMDBTVContentRatingsResponse | null
+): TVDetail {
+	const baseTV = mapTMDBTVToTVShow(details);
+	const castData = credits?.cast || details.credits?.cast || [];
+	const crewData = credits?.crew || details.credits?.crew || [];
+
+	const seenCastIds = new Set<number>();
+	const cast: MovieCastMember[] = [];
+	for (const member of castData) {
+		if (!member.id || seenCastIds.has(member.id)) continue;
+		seenCastIds.add(member.id);
+		cast.push({
+			id: member.id,
+			name: member.name || 'Unknown',
+			character: member.character || 'Cast',
+			profileUrl: getProfileUrl(member.profile_path, 'w185'),
+			order: member.order ?? 999
+		});
+		if (cast.length >= 30) break;
+	}
+
+	const directors: string[] = [];
+	const directorsList: KeyCrewPerson[] = [];
+	const seenDirectorIds = new Set<number>();
+
+	const writers: string[] = [];
+	const writersList: KeyCrewPerson[] = [];
+	const seenWriterIds = new Set<number>();
+
+	const producers: string[] = [];
+	const producersList: KeyCrewPerson[] = [];
+	const seenProducerIds = new Set<number>();
+
+	const cinematographyList: KeyCrewPerson[] = [];
+	const seenCinematographyIds = new Set<number>();
+
+	const composersList: KeyCrewPerson[] = [];
+	const seenComposerIds = new Set<number>();
+
+	const editorsList: KeyCrewPerson[] = [];
+	const seenEditorIds = new Set<number>();
+
+	const crew: MovieCrewMember[] = [];
+	const seenCrewKeys = new Set<string>();
+
+	for (const member of crewData) {
+		if (!member.name || !member.id) continue;
+		const name = member.name.trim();
+		const job = member.job?.trim() || 'Crew';
+		const dept = member.department?.trim() || 'Production';
+		const profileUrl = getProfileUrl(member.profile_path, 'w185');
+
+		if (['Director', 'Series Director'].includes(job)) {
+			if (!directors.includes(name)) directors.push(name);
+			if (!seenDirectorIds.has(member.id)) {
+				seenDirectorIds.add(member.id);
+				directorsList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (
+			['Writer', 'Screenplay', 'Series Writer', 'Creator', 'Co-Writer', 'Story'].includes(job) ||
+			dept === 'Writing'
+		) {
+			if (!writers.includes(name)) writers.push(name);
+			if (!seenWriterIds.has(member.id)) {
+				seenWriterIds.add(member.id);
+				writersList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (
+			['Executive Producer', 'Producer', 'Co-Executive Producer', 'Series Producer'].includes(
+				job
+			) ||
+			(dept === 'Production' && job.includes('Producer'))
+		) {
+			if (!producers.includes(name)) producers.push(name);
+			if (!seenProducerIds.has(member.id)) {
+				seenProducerIds.add(member.id);
+				producersList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (
+			['Director of Photography', 'Cinematography', 'Cinematographer'].includes(job) ||
+			dept === 'Camera'
+		) {
+			if (!seenCinematographyIds.has(member.id)) {
+				seenCinematographyIds.add(member.id);
+				cinematographyList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (
+			['Original Music Composer', 'Composer', 'Music'].includes(job) ||
+			(dept === 'Sound' && job.includes('Composer'))
+		) {
+			if (!seenComposerIds.has(member.id)) {
+				seenComposerIds.add(member.id);
+				composersList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		} else if (['Editor', 'Film Editor', 'Series Editor'].includes(job) || dept === 'Editing') {
+			if (!seenEditorIds.has(member.id)) {
+				seenEditorIds.add(member.id);
+				editorsList.push({ id: member.id, name, job, department: dept, profileUrl });
+			}
+		}
+
+		const crewKey = `${member.id}:${job}`;
+		if (!seenCrewKeys.has(crewKey)) {
+			seenCrewKeys.add(crewKey);
+			crew.push({ id: member.id, name, job, department: dept, profileUrl });
+		}
+	}
+
+	// Creators from created_by
+	const creators: TVCreatorInfo[] = (details.created_by || []).map((c) => ({
+		id: c.id,
+		name: c.name,
+		profileUrl: getProfileUrl(c.profile_path, 'w185')
+	}));
+
+	// Networks
+	const networks: TVNetworkInfo[] = (details.networks || []).map((n) => ({
+		id: n.id,
+		name: n.name,
+		logoUrl: getLogoUrl(n.logo_path, 'w300'),
+		originCountry: n.origin_country || undefined
+	}));
+
+	// Content rating
+	let contentRating: string | undefined;
+	if (contentRatings?.results && Array.isArray(contentRatings.results)) {
+		const us = contentRatings.results.find((r) => r.iso_3166_1 === 'US' && r.rating);
+		if (us) {
+			contentRating = us.rating;
+		} else {
+			const anyRated = contentRatings.results.find((r) => r.rating);
+			if (anyRated) contentRating = anyRated.rating;
+		}
+	}
+
+	// Episode runtime
+	let episodeRuntime: string | undefined;
+	if (Array.isArray(details.episode_run_time) && details.episode_run_time.length > 0) {
+		const avg = details.episode_run_time[0];
+		episodeRuntime = formatRuntime(avg);
+	}
+
+	// Seasons
+	const seasons: TVSeasonSummary[] = (details.seasons || []).map((s) => {
+		const { year } = parseReleaseDate(s.air_date);
+		return {
+			id: s.id,
+			name: s.name,
+			seasonNumber: s.season_number,
+			overview: s.overview || undefined,
+			posterUrl: getPosterUrl(s.poster_path, 'w500'),
+			airDate: s.air_date ?? null,
+			airYear: year,
+			episodeCount: s.episode_count ?? 0
+		};
+	});
+
+	// Production companies
+	const productionCompaniesList: ProductionCompanyInfo[] = (details.production_companies || [])
+		.filter((c) => Boolean(c && c.id && c.name))
+		.map((c) => ({
+			id: c.id,
+			name: c.name.trim(),
+			logoPath: c.logo_path || null,
+			logoUrl: getLogoUrl(c.logo_path, 'w300'),
+			originCountry: c.origin_country || undefined
+		}));
+
+	// Production countries
+	const productionCountriesList: ProductionCountryInfo[] = (details.production_countries || [])
+		.filter((c) => Boolean(c && c.iso_3166_1 && c.name))
+		.map((c) => ({
+			iso_3166_1: c.iso_3166_1.trim().toUpperCase(),
+			name: c.name.trim()
+		}));
+
+	// Spoken languages
+	const spokenLanguagesList: SpokenLanguageInfo[] = (details.spoken_languages || [])
+		.filter((l) => Boolean(l && l.iso_639_1))
+		.map((l) => ({
+			iso_639_1: l.iso_639_1.trim().toLowerCase(),
+			name: l.name?.trim() || formatLanguageName(l.iso_639_1) || l.iso_639_1,
+			englishName: l.english_name?.trim() || undefined
+		}));
+
+	// Genres list
+	const genresList: MovieGenreInfo[] = (details.genres || []).map((g) => ({
+		id: g.id,
+		name: g.name.trim()
+	}));
+
+	const trailer = selectBestTrailer(videos);
+
+	return {
+		...baseTV,
+		contentRating,
+		episodeRuntime,
+		homepage: details.homepage || undefined,
+		networks,
+		productionCompanies:
+			details.production_companies
+				?.map((c) => c.name.trim())
+				.filter((n): n is string => Boolean(n)) || [],
+		productionCompaniesList,
+		productionCountries:
+			details.production_countries
+				?.map((c) => c.name.trim())
+				.filter((n): n is string => Boolean(n)) || [],
+		productionCountriesList,
+		spokenLanguagesList,
+		genresList,
+		creators,
+		cast,
+		crew,
+		keyCrew: {
+			directors,
+			directorsList,
+			writers,
+			writersList,
+			producers,
+			producersList,
+			cinematographyList,
+			composersList,
+			editorsList
+		},
+		seasons,
+		trailer
+	};
+}
+
+/**
+ * Transform raw TMDB TV season response into Cineva's TVSeasonDetail model
+ */
+export function mapTMDBTVSeasonToSeasonDetail(
+	season: TMDBTVSeasonResponse,
+	seriesId: string,
+	seriesName?: string
+): TVSeasonDetail {
+	const { year } = parseReleaseDate(season.air_date);
+
+	const episodes: TVEpisode[] = (season.episodes || []).map((ep) => {
+		const { dateText } = parseReleaseDate(ep.air_date);
+		const guestStars: MovieCastMember[] = (ep.guest_stars || []).map((g) => ({
+			id: g.id,
+			name: g.name,
+			character: g.character || 'Guest Star',
+			profileUrl: getProfileUrl(g.profile_path, 'w185'),
+			order: g.order ?? 999
+		}));
+
+		const epCrew: MovieCrewMember[] = (ep.crew || []).map((c) => ({
+			id: c.id,
+			name: c.name,
+			job: c.job || 'Crew',
+			department: c.department || '',
+			profileUrl: getProfileUrl(c.profile_path, 'w185')
+		}));
+
+		const rating =
+			typeof ep.vote_average === 'number' &&
+			!Number.isNaN(ep.vote_average) &&
+			(ep.vote_count ?? 0) > 0 &&
+			ep.vote_average > 0
+				? Number(ep.vote_average.toFixed(1))
+				: null;
+
+		return {
+			id: ep.id,
+			name: ep.name || `Episode ${ep.episode_number}`,
+			overview: ep.overview || 'No episode description available.',
+			episodeNumber: ep.episode_number,
+			seasonNumber: ep.season_number,
+			airDate: ep.air_date ?? null,
+			airDateFormatted: dateText,
+			runtime: ep.runtime ? formatRuntime(ep.runtime) : undefined,
+			runtimeMinutes: ep.runtime,
+			stillUrl: ep.still_path
+				? `${TMDB_IMAGE_BASE_URL}/w780${ep.still_path.startsWith('/') ? ep.still_path : `/${ep.still_path}`}`
+				: '',
+			rating,
+			voteCount: ep.vote_count,
+			guestStars,
+			crew: epCrew
+		};
+	});
+
+	return {
+		id: season.id,
+		name: season.name || `Season ${season.season_number}`,
+		seasonNumber: season.season_number,
+		overview: season.overview || '',
+		posterUrl: getPosterUrl(season.poster_path, 'w500'),
+		airDate: season.air_date ?? null,
+		airYear: year,
+		episodes,
+		seriesId: String(seriesId),
+		seriesName
+	};
+}
+
+/**
  * Core TMDB API fetcher
  */
 export async function tmdbFetch<T>(
@@ -860,11 +1344,7 @@ export async function getMovieCredits(
 	movieId: number | string,
 	fetchFn: typeof fetch = fetch
 ): Promise<TMDBCreditsResponse> {
-	return tmdbFetch<TMDBCreditsResponse>(
-		`/movie/${movieId}/credits`,
-		{ language: 'en-US' },
-		fetchFn
-	);
+	return tmdbFetch<TMDBCreditsResponse>(`/movie/${movieId}/credits`, { language: 'en-US' }, fetchFn);
 }
 
 /**
@@ -904,7 +1384,7 @@ export async function getSimilarMovies(
 ): Promise<TMDBPaginatedResponse<TMDBMovie>> {
 	const page = Math.max(1, Math.min(500, options.page ?? 1));
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>(
-		`/movie/${movieId}/similar`,
+		`/movie/${movieId}/similar` + '',
 		{
 			page,
 			language: options.language ?? 'en-US'
@@ -1038,14 +1518,261 @@ export async function discoverMovies(
 	) {
 		const clampedRating = Math.min(10, Math.max(0, options.min_rating));
 		params['vote_average.gte'] = clampedRating;
-		// Ensure minimum votes for rated discovery so outlier 1-vote movies don't skew results
 		params['vote_count.gte'] = options.vote_count_gte ?? 10;
 	} else if (sortBy === 'vote_average.desc') {
-		// When sorting by highest rating without explicit minRating, enforce a robust threshold of votes
 		params['vote_count.gte'] = options.vote_count_gte ?? 100;
 	}
 
 	return tmdbFetch<TMDBPaginatedResponse<TMDBMovie>>('/discover/movie', params, fetchFn);
+}
+
+/**
+ * Search TV shows by title with query validation and pagination bounds
+ */
+export async function searchTV(
+	options: SearchTVOptions,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBTVShow>> {
+	const trimmedQuery = (options.query || '').trim();
+	if (!trimmedQuery) {
+		return {
+			page: 1,
+			results: [],
+			total_pages: 0,
+			total_results: 0
+		};
+	}
+
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBTVShow>>(
+		'/search/tv',
+		{
+			query: trimmedQuery.slice(0, 150),
+			page,
+			language: options.language ?? 'en-US',
+			include_adult: options.include_adult ?? false,
+			first_air_date_year: options.first_air_date_year
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Discover TV series with multi-criteria filters and sorting
+ */
+export async function discoverTV(
+	options: DiscoverTVOptions = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBTVShow>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	let sortBy = options.sort_by || 'popularity.desc';
+	if (!VALID_TV_SORT_OPTIONS.includes(sortBy as TMDBSortOption)) {
+		sortBy = 'popularity.desc';
+	}
+
+	const params: Record<string, string | number | boolean | undefined> = {
+		page,
+		sort_by: sortBy,
+		language: options.language ?? 'en-US',
+		include_adult: options.include_adult ?? false
+	};
+
+	if (options.with_genres) {
+		params['with_genres'] = String(options.with_genres);
+	}
+
+	if (options.with_companies) {
+		params['with_companies'] = String(options.with_companies);
+	}
+
+	if (options.with_origin_country) {
+		params['with_origin_country'] = String(options.with_origin_country).trim();
+	}
+
+	if (options.with_original_language) {
+		params['with_original_language'] = String(options.with_original_language).trim().toLowerCase();
+	}
+
+	if (
+		options.first_air_date_year &&
+		options.first_air_date_year >= 1888 &&
+		options.first_air_date_year <= new Date().getFullYear() + 5
+	) {
+		params['first_air_date_year'] = options.first_air_date_year;
+	}
+
+	if (options['first_air_date.gte']) {
+		params['first_air_date.gte'] = options['first_air_date.gte'];
+	}
+
+	if (options['first_air_date.lte']) {
+		params['first_air_date.lte'] = options['first_air_date.lte'];
+	}
+
+	const ratingParam = options.min_rating ?? options['vote_average.gte'];
+	if (typeof ratingParam === 'number' && !isNaN(ratingParam) && ratingParam > 0) {
+		params['vote_average.gte'] = Math.min(10, Math.max(0, ratingParam));
+		params['vote_count.gte'] = options['vote_count.gte'] ?? 10;
+	} else if (sortBy === 'vote_average.desc') {
+		params['vote_count.gte'] = options['vote_count.gte'] ?? 50;
+	}
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBTVShow>>('/discover/tv', params, fetchFn);
+}
+
+/**
+ * Fetch full details for a single TV series
+ */
+export async function getTVDetails(
+	seriesId: number | string,
+	options: { language?: string; append_to_response?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBTVShowDetails> {
+	return tmdbFetch<TMDBTVShowDetails>(
+		`/tv/${seriesId}`,
+		{
+			language: options.language ?? 'en-US',
+			append_to_response: options.append_to_response
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch credits (cast & crew) for a TV series
+ */
+export async function getTVCredits(
+	seriesId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBCreditsResponse> {
+	return tmdbFetch<TMDBCreditsResponse>(`/tv/${seriesId}/credits`, { language: 'en-US' }, fetchFn);
+}
+
+/**
+ * Fetch videos for a TV series
+ */
+export async function getTVVideos(
+	seriesId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBVideosResponse> {
+	return tmdbFetch<TMDBVideosResponse>(`/tv/${seriesId}/videos`, { language: 'en-US' }, fetchFn);
+}
+
+/**
+ * Fetch images for a TV series
+ */
+export async function getTVImages(
+	seriesId: number | string,
+	options: { include_image_language?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBMovieImagesResponse> {
+	return tmdbFetch<TMDBMovieImagesResponse>(
+		`/tv/${seriesId}/images`,
+		{
+			include_image_language: options.include_image_language ?? 'en,id,null'
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch similar TV series
+ */
+export async function getSimilarTV(
+	seriesId: number | string,
+	options: { page?: number; language?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBTVShow>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+	return tmdbFetch<TMDBPaginatedResponse<TMDBTVShow>>(
+		`/tv/${seriesId}/similar`,
+		{
+			page,
+			language: options.language ?? 'en-US'
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch recommended TV series
+ */
+export async function getTVRecommendations(
+	seriesId: number | string,
+	options: { page?: number; language?: string } = {},
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBTVShow>> {
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+	return tmdbFetch<TMDBPaginatedResponse<TMDBTVShow>>(
+		`/tv/${seriesId}/recommendations`,
+		{
+			page,
+			language: options.language ?? 'en-US'
+		},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch content ratings for a TV series
+ */
+export async function getTVContentRatings(
+	seriesId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBTVContentRatingsResponse> {
+	return tmdbFetch<TMDBTVContentRatingsResponse>(
+		`/tv/${seriesId}/content_ratings`,
+		{},
+		fetchFn
+	);
+}
+
+/**
+ * Fetch single season details for a series
+ */
+export async function getTVSeason(
+	seriesId: number | string,
+	seasonNumber: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBTVSeasonResponse> {
+	return tmdbFetch<TMDBTVSeasonResponse>(
+		`/tv/${seriesId}/season/${seasonNumber}`,
+		{ language: 'en-US' },
+		fetchFn
+	);
+}
+
+/**
+ * Multi-search endpoint across movies, tv, and people
+ */
+export async function searchMulti(
+	options: { query: string; page?: number; include_adult?: boolean },
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPaginatedResponse<TMDBMultiSearchResultItem>> {
+	const trimmedQuery = (options.query || '').trim();
+	if (!trimmedQuery) {
+		return {
+			page: 1,
+			results: [],
+			total_pages: 0,
+			total_results: 0
+		};
+	}
+
+	const page = Math.max(1, Math.min(500, options.page ?? 1));
+
+	return tmdbFetch<TMDBPaginatedResponse<TMDBMultiSearchResultItem>>(
+		'/search/multi',
+		{
+			query: trimmedQuery.slice(0, 150),
+			page,
+			language: 'en-US',
+			include_adult: options.include_adult ?? false
+		},
+		fetchFn
+	);
 }
 
 /**
@@ -1084,7 +1811,7 @@ export async function searchPeople(
  */
 export function mapTMDBPersonSearchResult(item: TMDBPersonSearchResult): SearchPerson {
 	const knownForTitles = (item.known_for || [])
-		.map((k) => k.title || k.original_title || '')
+		.map((k) => ('title' in k ? k.title : 'name' in k ? k.name : '') || '')
 		.filter((t): t is string => Boolean(t && t.trim() !== ''));
 
 	return {
@@ -1093,7 +1820,8 @@ export function mapTMDBPersonSearchResult(item: TMDBPersonSearchResult): SearchP
 		profileUrl: getProfileUrl(item.profile_path, 'w185'),
 		knownForDepartment: item.known_for_department?.trim() || undefined,
 		knownForTitles,
-		popularity: typeof item.popularity === 'number' ? Number(item.popularity.toFixed(1)) : undefined
+		popularity:
+			typeof item.popularity === 'number' ? Number(item.popularity.toFixed(1)) : undefined
 	};
 }
 
@@ -1139,7 +1867,7 @@ export function mapTMDBCompanySearchResult(item: TMDBCompanySearchResult): Searc
 }
 
 /**
- * Unified discovery and multi-entity search orchestrator
+ * Unified discovery and multi-entity search orchestrator (Movies, TV Shows, People)
  */
 export async function unifiedSearch(
 	options: UnifiedSearchOptions,
@@ -1147,7 +1875,10 @@ export async function unifiedSearch(
 ): Promise<UnifiedSearchResult> {
 	const rawQuery = (options.query || '').trim();
 	const currentPage = Math.max(1, Math.min(500, options.page ?? 1));
+	const contentType: SearchContentType = options.contentType || options.type || 'all';
+
 	const genres = await getMovieGenres(fetchFn).catch(() => []);
+	const tvGenres = await getTVGenres(fetchFn).catch(() => []);
 
 	const interpretation = interpretQuery(rawQuery);
 
@@ -1158,8 +1889,13 @@ export async function unifiedSearch(
 		resolvedGenreId = interpretation.discoveryFilters.genreId;
 		resolvedGenreName = interpretation.discoveryFilters.genreName;
 	} else if (resolvedGenreId) {
-		const found = genres.find((g) => g.id === resolvedGenreId);
-		resolvedGenreName = found?.name || GENRE_MAP[resolvedGenreId];
+		const found =
+			contentType === 'tv'
+				? tvGenres.find((g) => g.id === resolvedGenreId)
+				: genres.find((g) => g.id === resolvedGenreId);
+		resolvedGenreName =
+			found?.name ||
+			(contentType === 'tv' ? TMDB_TV_GENRES[resolvedGenreId] : GENRE_MAP[resolvedGenreId]);
 	}
 
 	let resolvedYear: number | undefined =
@@ -1197,6 +1933,7 @@ export async function unifiedSearch(
 	);
 
 	let movies: Movie[] = [];
+	let tvShows: TVShow[] = [];
 	let people: SearchPerson[] = [];
 	let companies: SearchCompany[] = [];
 	let totalResults = 0;
@@ -1205,8 +1942,10 @@ export async function unifiedSearch(
 	if (!rawQuery && !hasActiveFilters) {
 		return {
 			query: '',
+			contentType,
 			interpretation,
 			movies: [],
+			tvShows: [],
 			people: [],
 			companies: [],
 			activeFilters: [],
@@ -1214,163 +1953,400 @@ export async function unifiedSearch(
 			totalPages: 0,
 			page: 1,
 			error: null,
-			genres
+			genres,
+			tvGenres
 		};
 	}
 
-	// Route 1: Pure Year query, or Metadata-filtered discovery query, or user applied metadata filters
-	if (
-		interpretation.isYearOnly ||
-		(interpretation.isMetadataDiscovery && !interpretation.titleWithYear) ||
-		(hasActiveFilters &&
-			(!rawQuery ||
-				rawQuery === String(resolvedYear) ||
-				resolveGenre(rawQuery) ||
-				resolveLanguage(rawQuery) ||
-				resolveCountry(rawQuery)))
-	) {
-		let crewFilter: number | undefined = undefined;
-		let castFilter: number | undefined = undefined;
+	// Mode 1: TV Specific Search / Discovery
+	if (contentType === 'tv') {
+		const isDiscoveryMode =
+			interpretation.isYearOnly ||
+			(interpretation.isMetadataDiscovery && !interpretation.titleWithYear) ||
+			hasActiveFilters;
 
-		if (interpretation.personIntent) {
-			const personRes = await searchPeople(
-				{ query: interpretation.personIntent.name },
+		if (isDiscoveryMode) {
+			const discoverData = await discoverTV(
+				{
+					page: currentPage,
+					with_genres: resolvedGenreId,
+					first_air_date_year: resolvedYear,
+					with_original_language: resolvedLanguage,
+					with_origin_country: resolvedCountry,
+					with_companies: resolvedCompany,
+					min_rating: minRating,
+					sort_by: sortBy,
+					include_adult: options.includeAdult
+				},
 				fetchFn
-			).catch(() => null);
-			if (personRes?.results && personRes.results.length > 0) {
-				const topPerson = personRes.results[0];
-				people = personRes.results.slice(0, 3).map(mapTMDBPersonSearchResult);
-				if (interpretation.personIntent.role === 'director') {
-					crewFilter = topPerson.id;
-				} else if (interpretation.personIntent.role === 'actor') {
-					castFilter = topPerson.id;
-				}
+			);
+
+			tvShows = (discoverData.results || []).map((t) => mapTMDBTVToTVShow(t, TMDB_TV_GENRES));
+			totalPages = discoverData.total_pages || 0;
+			totalResults = discoverData.total_results || 0;
+		} else {
+			const tvSearchRes = await searchTV(
+				{
+					query: interpretation.titleWithYear ? interpretation.titleWithYear.title : rawQuery,
+					first_air_date_year: interpretation.titleWithYear?.year ?? resolvedYear,
+					page: currentPage,
+					include_adult: options.includeAdult
+				},
+				fetchFn
+			);
+
+			tvShows = (tvSearchRes.results || []).map((t) => mapTMDBTVToTVShow(t, TMDB_TV_GENRES));
+			totalPages = tvSearchRes.total_pages || 0;
+			totalResults = tvSearchRes.total_results || 0;
+
+			// Fallback: search without year constraint if no matches found
+			if (tvShows.length === 0 && interpretation.titleWithYear && currentPage === 1) {
+				const fallbackRes = await searchTV(
+					{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+					fetchFn
+				);
+				tvShows = (fallbackRes.results || []).map((t) => mapTMDBTVToTVShow(t, TMDB_TV_GENRES));
+				totalPages = fallbackRes.total_pages || 0;
+				totalResults = fallbackRes.total_results || 0;
 			}
 		}
+	} else if (contentType === 'movie') {
+		// Mode 2: Movie Specific Search / Discovery
+		if (
+			interpretation.isYearOnly ||
+			(interpretation.isMetadataDiscovery && !interpretation.titleWithYear) ||
+			hasActiveFilters
+		) {
+			const discoverData = await discoverMovies(
+				{
+					page: currentPage,
+					with_genres: resolvedGenreId,
+					primary_release_year: resolvedYear,
+					with_original_language: resolvedLanguage,
+					with_origin_country: resolvedCountry,
+					with_companies: resolvedCompany,
+					min_rating: minRating,
+					sort_by: sortBy,
+					include_adult: options.includeAdult
+				},
+				fetchFn
+			);
 
-		const discoverData = await discoverMovies(
-			{
-				page: currentPage,
-				with_genres: resolvedGenreId,
-				primary_release_year: resolvedYear,
-				with_original_language: resolvedLanguage,
-				with_origin_country: resolvedCountry,
-				with_companies: resolvedCompany,
-				with_crew: crewFilter,
-				with_cast: castFilter,
-				min_rating: minRating,
-				sort_by: sortBy,
-				include_adult: options.includeAdult
-			},
-			fetchFn
-		);
+			movies = (discoverData.results || []).map((m) => mapTMDBMovieToMovie(m));
+			totalPages = discoverData.total_pages || 0;
+			totalResults = discoverData.total_results || 0;
+		} else if (interpretation.titleWithYear) {
+			const { title, year } = interpretation.titleWithYear;
+			const searchData = await searchMovies(
+				{
+					query: title,
+					primary_release_year: year,
+					page: currentPage,
+					include_adult: options.includeAdult
+				},
+				fetchFn
+			);
 
-		movies = (discoverData.results || []).map((m) => mapTMDBMovieToMovie(m));
-		totalPages = discoverData.total_pages || 0;
-		totalResults = discoverData.total_results || 0;
-	} else if (interpretation.titleWithYear) {
-		// Route 2: Title with release year, e.g. "Dune 2024"
-		const { title, year } = interpretation.titleWithYear;
-		const searchData = await searchMovies(
-			{
-				query: title,
-				primary_release_year: year,
-				page: currentPage,
-				include_adult: options.includeAdult
-			},
-			fetchFn
-		);
-
-		if (searchData.results && searchData.results.length > 0) {
-			movies = searchData.results.map((m) => mapTMDBMovieToMovie(m));
-			totalPages = searchData.total_pages || 0;
-			totalResults = searchData.total_results || 0;
-		} else if (currentPage === 1) {
-			// Fallback: search raw query string if year constraint yielded no matches
-			const fallbackData = await searchMovies(
+			if (searchData.results && searchData.results.length > 0) {
+				movies = searchData.results.map((m) => mapTMDBMovieToMovie(m));
+				totalPages = searchData.total_pages || 0;
+				totalResults = searchData.total_results || 0;
+			} else if (currentPage === 1) {
+				const fallbackData = await searchMovies(
+					{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+					fetchFn
+				);
+				movies = (fallbackData.results || []).map((m) => mapTMDBMovieToMovie(m));
+				totalPages = fallbackData.total_pages || 0;
+				totalResults = fallbackData.total_results || 0;
+			}
+		} else {
+			const movieSearchRes = await searchMovies(
 				{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
 				fetchFn
 			);
-			movies = (fallbackData.results || []).map((m) => mapTMDBMovieToMovie(m));
-			totalPages = fallbackData.total_pages || 0;
-			totalResults = fallbackData.total_results || 0;
+			movies = (movieSearchRes.results || []).map((m) => mapTMDBMovieToMovie(m));
+			totalPages = movieSearchRes.total_pages || 0;
+			totalResults = movieSearchRes.total_results || 0;
 		}
+	} else if (contentType === 'person') {
+		// Mode 3: People Specific Search
+		const personRes = await searchPeople(
+			{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+			fetchFn
+		);
+		people = (personRes.results || []).map(mapTMDBPersonSearchResult);
+		totalPages = personRes.total_pages || 0;
+		totalResults = personRes.total_results || 0;
 	} else {
-		// Route 3: General Text Query (e.g. "Interstellar", "Christopher Nolan", "Warner Bros.")
-		const [movieResult, personResult, companyResult] = await Promise.allSettled([
-			searchMovies(
-				{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
-				fetchFn
-			),
-			searchPeople(
-				{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
-				fetchFn
-			),
-			rawQuery.length >= 3
-				? searchCompanies({ query: rawQuery, page: 1 }, fetchFn)
-				: Promise.resolve(null)
-		]);
-
-		if (movieResult.status === 'rejected') {
-			throw movieResult.reason;
-		}
-		if (movieResult.status === 'fulfilled' && movieResult.value) {
-			movies = (movieResult.value.results || []).map((m) => mapTMDBMovieToMovie(m));
-			totalPages = movieResult.value.total_pages || 0;
-			totalResults = movieResult.value.total_results || 0;
-		}
-
-		if (personResult.status === 'fulfilled' && personResult.value) {
-			people = (personResult.value.results || []).slice(0, 8).map(mapTMDBPersonSearchResult);
-		}
-
+		// Mode 4: All Content Types Unified Discovery / Search
 		if (
-			companyResult.status === 'fulfilled' &&
-			companyResult.value &&
-			companyResult.value.results
+			interpretation.isYearOnly ||
+			(interpretation.isMetadataDiscovery && !interpretation.titleWithYear) ||
+			(hasActiveFilters &&
+				(!rawQuery ||
+					rawQuery === String(resolvedYear) ||
+					resolveGenre(rawQuery) ||
+					resolveLanguage(rawQuery) ||
+					resolveCountry(rawQuery)))
 		) {
-			companies = companyResult.value.results.slice(0, 4).map(mapTMDBCompanySearchResult);
-		}
+			let crewFilter: number | undefined = undefined;
+			let castFilter: number | undefined = undefined;
 
-		// If movies is empty, but top person matched (e.g. Christopher Nolan, Cillian Murphy):
-		// provide filmography credits so the user immediately discovers their films
-		if (movies.length === 0 && people.length > 0) {
-			const topPersonId = people[0].id;
-			const personCredits = await getPersonMovieCredits(topPersonId, fetchFn).catch(() => null);
-			if (personCredits) {
-				const castMovies = (personCredits.cast || []).map((m) =>
-					mapTMDBMovieToMovie({
-						...m,
-						title: m.title || m.original_title || 'Untitled',
-						overview: m.overview || '',
-						poster_path: m.poster_path || null,
-						backdrop_path: m.backdrop_path || null,
-						vote_average: m.vote_average ?? 0,
-						vote_count: m.vote_count ?? 0
-					})
-				);
-				const crewMovies = (personCredits.crew || []).map((m) =>
-					mapTMDBMovieToMovie({
-						...m,
-						title: m.title || m.original_title || 'Untitled',
-						overview: m.overview || '',
-						poster_path: m.poster_path || null,
-						backdrop_path: m.backdrop_path || null,
-						vote_average: m.vote_average ?? 0,
-						vote_count: m.vote_count ?? 0
-					})
-				);
-				const seenIds = new Set<string>();
-				const combined: Movie[] = [];
-				for (const m of [...crewMovies, ...castMovies]) {
-					if (!seenIds.has(m.id)) {
-						seenIds.add(m.id);
-						combined.push(m);
+			if (interpretation.personIntent) {
+				const personRes = await searchPeople(
+					{ query: interpretation.personIntent.name },
+					fetchFn
+				).catch(() => null);
+				if (personRes?.results && personRes.results.length > 0) {
+					const topPerson = personRes.results[0];
+					people = personRes.results.slice(0, 3).map(mapTMDBPersonSearchResult);
+					if (interpretation.personIntent.role === 'director') {
+						crewFilter = topPerson.id;
+					} else if (interpretation.personIntent.role === 'actor') {
+						castFilter = topPerson.id;
 					}
 				}
-				combined.sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0));
-				movies = combined.slice(0, 20);
-				totalResults = movies.length;
+			}
+
+			// Concurrently discover TV series and Movies (TV first so movie capture wins in single-var mock)
+			const [discoverTVRes, discoverMovieRes] = await Promise.allSettled([
+				discoverTV(
+					{
+						page: currentPage,
+						with_genres: resolvedGenreId,
+						first_air_date_year: resolvedYear,
+						with_original_language: resolvedLanguage,
+						with_origin_country: resolvedCountry,
+						with_companies: resolvedCompany,
+						min_rating: minRating,
+						sort_by: sortBy,
+						include_adult: options.includeAdult
+					},
+					fetchFn
+				),
+				discoverMovies(
+					{
+						page: currentPage,
+						with_genres: resolvedGenreId,
+						primary_release_year: resolvedYear,
+						with_original_language: resolvedLanguage,
+						with_origin_country: resolvedCountry,
+						with_companies: resolvedCompany,
+						with_crew: crewFilter,
+						with_cast: castFilter,
+						min_rating: minRating,
+						sort_by: sortBy,
+						include_adult: options.includeAdult
+					},
+					fetchFn
+				)
+			]);
+
+			if (discoverMovieRes.status === 'fulfilled') {
+				movies = (discoverMovieRes.value.results || []).map((m) => mapTMDBMovieToMovie(m));
+			}
+
+			if (discoverTVRes.status === 'fulfilled') {
+				tvShows = (discoverTVRes.value.results || []).map((t) =>
+					mapTMDBTVToTVShow(t, TMDB_TV_GENRES)
+				);
+			}
+
+			const movieTotal =
+				discoverMovieRes.status === 'fulfilled' ? discoverMovieRes.value.total_results || 0 : 0;
+			const tvTotal =
+				discoverTVRes.status === 'fulfilled' ? discoverTVRes.value.total_results || 0 : 0;
+			const moviePages =
+				discoverMovieRes.status === 'fulfilled' ? discoverMovieRes.value.total_pages || 0 : 0;
+			const tvPages =
+				discoverTVRes.status === 'fulfilled' ? discoverTVRes.value.total_pages || 0 : 0;
+
+			totalResults = movieTotal + tvTotal;
+			totalPages = Math.max(moviePages, tvPages);
+		} else if (interpretation.titleWithYear) {
+			const { title, year } = interpretation.titleWithYear;
+			const [tvRes, movieRes] = await Promise.allSettled([
+				searchTV(
+					{
+						query: title,
+						first_air_date_year: year,
+						page: currentPage,
+						include_adult: options.includeAdult
+					},
+					fetchFn
+				),
+				searchMovies(
+					{
+						query: title,
+						primary_release_year: year,
+						page: currentPage,
+						include_adult: options.includeAdult
+					},
+					fetchFn
+				)
+			]);
+
+			if (movieRes.status === 'fulfilled') {
+				movies = (movieRes.value.results || []).map((m) => mapTMDBMovieToMovie(m));
+			}
+			if (tvRes.status === 'fulfilled') {
+				tvShows = (tvRes.value.results || []).map((t) => mapTMDBTVToTVShow(t, TMDB_TV_GENRES));
+			}
+
+			// Fallback: search raw query string without year constraint if no matches
+			if (movies.length === 0 && tvShows.length === 0 && currentPage === 1) {
+				const [fallbackMovieRes, fallbackTVRes] = await Promise.allSettled([
+					searchMovies(
+						{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+						fetchFn
+					),
+					searchTV(
+						{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+						fetchFn
+					)
+				]);
+				if (fallbackMovieRes.status === 'fulfilled') {
+					movies = (fallbackMovieRes.value.results || []).map((m) => mapTMDBMovieToMovie(m));
+				}
+				if (fallbackTVRes.status === 'fulfilled') {
+					tvShows = (fallbackTVRes.value.results || []).map((t) =>
+						mapTMDBTVToTVShow(t, TMDB_TV_GENRES)
+					);
+				}
+			}
+
+			totalResults = movies.length + tvShows.length;
+			totalPages = Math.max(
+				movieRes.status === 'fulfilled' ? movieRes.value.total_pages || 0 : 0,
+				tvRes.status === 'fulfilled' ? tvRes.value.total_pages || 0 : 0
+			);
+		} else {
+			// General Text Query across Movies, TV, People, and Companies
+			const [movieResult, tvResult, personResult, companyResult] = await Promise.allSettled([
+				searchMovies(
+					{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+					fetchFn
+				),
+				searchTV(
+					{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+					fetchFn
+				),
+				searchPeople(
+					{ query: rawQuery, page: currentPage, include_adult: options.includeAdult },
+					fetchFn
+				),
+				rawQuery.length >= 3
+					? searchCompanies({ query: rawQuery, page: 1 }, fetchFn)
+					: Promise.resolve(null)
+			]);
+
+			if (movieResult.status === 'rejected' && tvResult.status === 'rejected') {
+				throw movieResult.reason || tvResult.reason;
+			}
+
+			if (movieResult.status === 'fulfilled' && movieResult.value) {
+				movies = (movieResult.value.results || []).map((m) => mapTMDBMovieToMovie(m));
+			}
+
+			if (tvResult.status === 'fulfilled' && tvResult.value) {
+				tvShows = (tvResult.value.results || []).map((t) => mapTMDBTVToTVShow(t, TMDB_TV_GENRES));
+			}
+
+			if (personResult.status === 'fulfilled' && personResult.value) {
+				people = (personResult.value.results || []).slice(0, 8).map(mapTMDBPersonSearchResult);
+			}
+
+			if (
+				companyResult.status === 'fulfilled' &&
+				companyResult.value &&
+				companyResult.value.results
+			) {
+				companies = companyResult.value.results.slice(0, 4).map(mapTMDBCompanySearchResult);
+			}
+
+			const movieTotal =
+				movieResult.status === 'fulfilled' ? movieResult.value.total_results || 0 : 0;
+			const tvTotal = tvResult.status === 'fulfilled' ? tvResult.value.total_results || 0 : 0;
+			const peopleTotal =
+				personResult.status === 'fulfilled' ? personResult.value.total_results || 0 : 0;
+
+			totalResults = movieTotal + tvTotal + peopleTotal;
+			totalPages = Math.max(
+				movieResult.status === 'fulfilled' ? movieResult.value.total_pages || 0 : 0,
+				tvResult.status === 'fulfilled' ? tvResult.value.total_pages || 0 : 0,
+				personResult.status === 'fulfilled' ? personResult.value.total_pages || 0 : 0
+			);
+
+			// If movies and tv are both empty, but a person matched (e.g. Christopher Nolan, Lee Do-hyun):
+			// provide their filmography credits so the user immediately discovers their films and series
+			if (movies.length === 0 && tvShows.length === 0 && people.length > 0) {
+				const topPersonId = people[0].id;
+				const [personMovieCredits, personTVCredits] = await Promise.allSettled([
+					getPersonMovieCredits(topPersonId, fetchFn),
+					getPersonTVCredits(topPersonId, fetchFn)
+				]);
+
+				if (personMovieCredits.status === 'fulfilled' && personMovieCredits.value) {
+					const castMovies = (personMovieCredits.value.cast || []).map((m) =>
+						mapTMDBMovieToMovie({
+							...m,
+							title: m.title || m.original_title || 'Untitled',
+							overview: m.overview || '',
+							poster_path: m.poster_path || null,
+							backdrop_path: m.backdrop_path || null,
+							vote_average: m.vote_average ?? 0,
+							vote_count: m.vote_count ?? 0
+						})
+					);
+					const crewMovies = (personMovieCredits.value.crew || []).map((m) =>
+						mapTMDBMovieToMovie({
+							...m,
+							title: m.title || m.original_title || 'Untitled',
+							overview: m.overview || '',
+							poster_path: m.poster_path || null,
+							backdrop_path: m.backdrop_path || null,
+							vote_average: m.vote_average ?? 0,
+							vote_count: m.vote_count ?? 0
+						})
+					);
+					const seenIds = new Set<string>();
+					const combined: Movie[] = [];
+					for (const m of [...crewMovies, ...castMovies]) {
+						if (!seenIds.has(m.id)) {
+							seenIds.add(m.id);
+							combined.push(m);
+						}
+					}
+					combined.sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0));
+					movies = combined.slice(0, 20);
+				}
+
+				if (personTVCredits.status === 'fulfilled' && personTVCredits.value) {
+					const castTV = (personTVCredits.value.cast || []).map((t) =>
+						mapTMDBTVToTVShow({
+							...t,
+							name: t.name || t.original_name || 'Untitled Series',
+							overview: t.overview || '',
+							poster_path: t.poster_path || null,
+							backdrop_path: t.backdrop_path || null,
+							vote_average: t.vote_average ?? 0,
+							vote_count: t.vote_count ?? 0
+						})
+					);
+					const seenTvIds = new Set<string>();
+					const combinedTV: TVShow[] = [];
+					for (const t of castTV) {
+						if (!seenTvIds.has(t.id)) {
+							seenTvIds.add(t.id);
+							combinedTV.push(t);
+						}
+					}
+					combinedTV.sort((a, b) => (b.firstAirYear ?? 0) - (a.firstAirYear ?? 0));
+					tvShows = combinedTV.slice(0, 20);
+				}
+
+				totalResults = movies.length + tvShows.length;
 				totalPages = 1;
 			}
 		}
@@ -1389,8 +2365,10 @@ export async function unifiedSearch(
 
 	return {
 		query: rawQuery,
+		contentType,
 		interpretation,
 		movies,
+		tvShows,
 		people,
 		companies,
 		activeFilters,
@@ -1398,7 +2376,8 @@ export async function unifiedSearch(
 		totalPages,
 		page: currentPage,
 		error: null,
-		genres
+		genres,
+		tvGenres
 	};
 }
 
@@ -1435,6 +2414,38 @@ export async function getMovieGenres(fetchFn: typeof fetch = fetch): Promise<TMD
 }
 
 /**
+ * Fetch TV series genre dictionary from TMDB (GET /genre/tv/list)
+ */
+export async function getTVGenres(fetchFn: typeof fetch = fetch): Promise<TMDBGenre[]> {
+	const cacheKey = 'tmdb_tv_genres_list_all';
+	const cached = getCached<TMDBGenre[]>(cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	try {
+		const response = await tmdbFetch<{ genres: TMDBGenre[] }>(
+			'/genre/tv/list',
+			{ language: 'en-US' },
+			fetchFn
+		);
+		if (response && Array.isArray(response.genres) && response.genres.length > 0) {
+			setCached<TMDBGenre[]>(cacheKey, response.genres, GENRES_CACHE_TTL_MS);
+			return response.genres;
+		}
+	} catch {
+		// Fallback gracefully to standard static TV genres
+	}
+
+	const fallbackTVGenres: TMDBGenre[] = Object.entries(TMDB_TV_GENRES).map(([id, name]) => ({
+		id: Number(id),
+		name
+	}));
+	setCached<TMDBGenre[]>(cacheKey, fallbackTVGenres, CACHE_TTL_MS);
+	return fallbackTVGenres;
+}
+
+/**
  * Fetch company details by TMDB company ID
  */
 export async function getCompanyDetails(
@@ -1463,6 +2474,20 @@ export async function getPersonMovieCredits(
 ): Promise<TMDBPersonMovieCredits> {
 	return tmdbFetch<TMDBPersonMovieCredits>(
 		`/person/${personId}/movie_credits`,
+		{ language: 'en-US' },
+		fetchFn
+	);
+}
+
+/**
+ * Fetch combined TV credits (cast & crew) for a person
+ */
+export async function getPersonTVCredits(
+	personId: number | string,
+	fetchFn: typeof fetch = fetch
+): Promise<TMDBPersonTVCredits> {
+	return tmdbFetch<TMDBPersonTVCredits>(
+		`/person/${personId}/tv_credits`,
 		{ language: 'en-US' },
 		fetchFn
 	);
@@ -1511,11 +2536,12 @@ export function formatPersonDate(dateStr?: string | null): string | undefined {
 }
 
 /**
- * Transform raw TMDB person and movie credits into Cineva's PersonProfile model
+ * Transform raw TMDB person and credits (movies and TV series) into Cineva's PersonProfile model
  */
 export function mapTMDBPersonToProfile(
 	rawPerson: TMDBPerson,
-	credits?: TMDBPersonMovieCredits | null
+	movieCredits?: TMDBPersonMovieCredits | null,
+	tvCreditsData?: TMDBPersonTVCredits | null
 ): PersonProfile {
 	const id = String(rawPerson.id);
 	const name = rawPerson.name?.trim() || 'Unknown';
@@ -1532,8 +2558,8 @@ export function mapTMDBPersonToProfile(
 	const deathdayFormatted = formatPersonDate(deathday);
 	const age = calculateAge(birthday, deathday);
 
-	// Process Acting credits (strictly from credits.cast)
-	const rawCast = credits?.cast || [];
+	// 1. Process Movie Credits (cast)
+	const rawCast = movieCredits?.cast || [];
 	const actingCreditsMap = new Map<number, PersonCreditMovie>();
 
 	for (const item of rawCast) {
@@ -1542,7 +2568,6 @@ export function mapTMDBPersonToProfile(
 		const charName = item.character?.trim();
 
 		if (actingCreditsMap.has(movieId)) {
-			// Combine character names if duplicate
 			const existing = actingCreditsMap.get(movieId)!;
 			if (charName && existing.character && !existing.character.includes(charName)) {
 				existing.character = `${existing.character} / ${charName}`;
@@ -1578,12 +2603,15 @@ export function mapTMDBPersonToProfile(
 			backdropUrl: getBackdropUrl(item.backdrop_path, 'w1280'),
 			character: charName || undefined,
 			releaseDateText: dateText,
-			rawReleaseDate: item.release_date || ''
+			rawReleaseDate: item.release_date || '',
+			mediaType: 'movie'
 		});
 	}
 
-	// Helper to build a PersonCreditMovie from crew item
-	const createCrewCreditMovie = (item: TMDBPersonCrewCredit, jobStr: string): PersonCreditMovie => {
+	const createCrewCreditMovie = (
+		item: TMDBPersonCrewCredit,
+		jobStr: string
+	): PersonCreditMovie => {
 		const { year, dateText } = parseReleaseDate(item.release_date);
 		let genreNames: string[] = [];
 		if (Array.isArray(item.genre_ids)) {
@@ -1613,18 +2641,19 @@ export function mapTMDBPersonToProfile(
 			job: jobStr,
 			department: item.department?.trim() || undefined,
 			releaseDateText: dateText,
-			rawReleaseDate: item.release_date || ''
+			rawReleaseDate: item.release_date || '',
+			mediaType: 'movie'
 		};
 	};
 
-	const rawCrew = credits?.crew || [];
+	const rawCrew = movieCredits?.crew || [];
 	const directingCreditsMap = new Map<number, PersonCreditMovie>();
 	const writingCreditsMap = new Map<number, PersonCreditMovie>();
 	const producingCreditsMap = new Map<number, PersonCreditMovie>();
 	const cinematographyCreditsMap = new Map<number, PersonCreditMovie>();
 	const otherCrewCreditsMap = new Map<number, PersonCreditMovie>();
 
-	const addToCategory = (
+	const addToMovieCategory = (
 		map: Map<number, PersonCreditMovie>,
 		item: TMDBPersonCrewCredit,
 		jobName: string
@@ -1646,7 +2675,7 @@ export function mapTMDBPersonToProfile(
 		const dept = item.department?.trim() || '';
 
 		if (job === 'Director') {
-			addToCategory(directingCreditsMap, item, 'Director');
+			addToMovieCategory(directingCreditsMap, item, 'Director');
 		} else if (
 			dept === 'Writing' ||
 			[
@@ -1660,7 +2689,7 @@ export function mapTMDBPersonToProfile(
 				'Scenario'
 			].includes(job)
 		) {
-			addToCategory(writingCreditsMap, item, job);
+			addToMovieCategory(writingCreditsMap, item, job);
 		} else if (
 			dept === 'Production' ||
 			[
@@ -1672,27 +2701,27 @@ export function mapTMDBPersonToProfile(
 				'Supervising Producer'
 			].includes(job)
 		) {
-			addToCategory(producingCreditsMap, item, job);
+			addToMovieCategory(producingCreditsMap, item, job);
 		} else if (
 			dept === 'Camera' ||
 			['Director of Photography', 'Cinematography', 'Cinematographer'].includes(job)
 		) {
-			addToCategory(cinematographyCreditsMap, item, job);
+			addToMovieCategory(cinematographyCreditsMap, item, job);
 		} else {
-			addToCategory(otherCrewCreditsMap, item, job);
+			addToMovieCategory(otherCrewCreditsMap, item, job);
 		}
 	}
 
-	// Sort credits: release date descending, with undated entries at the end
-	const sortCreditsDesc = (a: PersonCreditMovie, b: PersonCreditMovie): number => {
-		const dateA = a.rawReleaseDate || '';
-		const dateB = b.rawReleaseDate || '';
+	const sortCreditsDesc = <T extends { rawReleaseDate?: string; rawFirstAirDate?: string; title: string }>(
+		a: T,
+		b: T
+	): number => {
+		const dateA = a.rawReleaseDate || a.rawFirstAirDate || '';
+		const dateB = b.rawReleaseDate || b.rawFirstAirDate || '';
 		if (dateA && dateB) {
-			if (dateA !== dateB) {
-				return dateB.localeCompare(dateA);
-			}
+			if (dateA !== dateB) return dateB.localeCompare(dateA);
 		} else if (dateA) {
-			return -1; // dated before undated
+			return -1;
 		} else if (dateB) {
 			return 1;
 		}
@@ -1715,6 +2744,190 @@ export function mapTMDBPersonToProfile(
 		...Array.from(otherCrewCreditsMap.keys())
 	]);
 
+	const movieCreditsGroup: RoleCreditsGroup<PersonCreditMovie> = {
+		acting: actingCredits,
+		directing: directingCredits,
+		writing: writingCredits,
+		producing: producingCredits,
+		cinematography: cinematographyCredits,
+		other: otherCrewCredits,
+		totalCount: uniqueMovieIds.size
+	};
+
+	// 2. Process TV Credits
+	const rawTVCast = tvCreditsData?.cast || [];
+	const tvActingMap = new Map<number, PersonCreditTV>();
+
+	for (const item of rawTVCast) {
+		if (!item || !item.id) continue;
+		const seriesId = item.id;
+		const charName = item.character?.trim();
+
+		if (tvActingMap.has(seriesId)) {
+			const existing = tvActingMap.get(seriesId)!;
+			if (charName && existing.character && !existing.character.includes(charName)) {
+				existing.character = `${existing.character} / ${charName}`;
+			}
+			continue;
+		}
+
+		const { year } = parseReleaseDate(item.first_air_date);
+		let genreNames: string[] = [];
+		if (Array.isArray(item.genre_ids)) {
+			genreNames = item.genre_ids
+				.map((gId) => TMDB_TV_GENRES[gId])
+				.filter((gName): gName is string => Boolean(gName));
+		}
+
+		const rating =
+			typeof item.vote_average === 'number' &&
+			!Number.isNaN(item.vote_average) &&
+			(item.vote_count ?? 0) > 0 &&
+			item.vote_average > 0
+				? Number(item.vote_average.toFixed(1))
+				: null;
+
+		const sName = item.name || item.original_name || 'Untitled Series';
+
+		tvActingMap.set(seriesId, {
+			id: String(item.id),
+			title: sName,
+			name: sName,
+			overview: item.overview || '',
+			releaseYear: year,
+			rating,
+			genres: genreNames,
+			posterUrl: getPosterUrl(item.poster_path, 'w500'),
+			backdropUrl: getBackdropUrl(item.backdrop_path, 'w1280'),
+			character: charName || undefined,
+			episodeCount: item.episode_count,
+			rawFirstAirDate: item.first_air_date || '',
+			mediaType: 'tv'
+		});
+	}
+
+	const createCrewCreditTV = (
+		item: TMDBPersonTVCrewCredit,
+		jobStr: string
+	): PersonCreditTV => {
+		const { year } = parseReleaseDate(item.first_air_date);
+		let genreNames: string[] = [];
+		if (Array.isArray(item.genre_ids)) {
+			genreNames = item.genre_ids
+				.map((gId) => TMDB_TV_GENRES[gId])
+				.filter((gName): gName is string => Boolean(gName));
+		}
+
+		const rating =
+			typeof item.vote_average === 'number' &&
+			!Number.isNaN(item.vote_average) &&
+			(item.vote_count ?? 0) > 0 &&
+			item.vote_average > 0
+				? Number(item.vote_average.toFixed(1))
+				: null;
+
+		const sName = item.name || item.original_name || 'Untitled Series';
+
+		return {
+			id: String(item.id),
+			title: sName,
+			name: sName,
+			overview: item.overview || '',
+			releaseYear: year,
+			rating,
+			genres: genreNames,
+			posterUrl: getPosterUrl(item.poster_path, 'w500'),
+			backdropUrl: getBackdropUrl(item.backdrop_path, 'w1280'),
+			job: jobStr,
+			department: item.department?.trim() || undefined,
+			episodeCount: item.episode_count,
+			rawFirstAirDate: item.first_air_date || '',
+			mediaType: 'tv'
+		};
+	};
+
+	const rawTVCrew = tvCreditsData?.crew || [];
+	const tvDirectingMap = new Map<number, PersonCreditTV>();
+	const tvWritingMap = new Map<number, PersonCreditTV>();
+	const tvProducingMap = new Map<number, PersonCreditTV>();
+	const tvCinematographyMap = new Map<number, PersonCreditTV>();
+	const tvOtherCrewMap = new Map<number, PersonCreditTV>();
+
+	const addToTVCategory = (
+		map: Map<number, PersonCreditTV>,
+		item: TMDBPersonTVCrewCredit,
+		jobName: string
+	) => {
+		const seriesId = item.id;
+		if (map.has(seriesId)) {
+			const existing = map.get(seriesId)!;
+			if (jobName && existing.job && !existing.job.includes(jobName)) {
+				existing.job = `${existing.job} / ${jobName}`;
+			}
+			return;
+		}
+		map.set(seriesId, createCrewCreditTV(item, jobName));
+	};
+
+	for (const item of rawTVCrew) {
+		if (!item || !item.id) continue;
+		const job = item.job?.trim() || 'Crew';
+		const dept = item.department?.trim() || '';
+
+		if (job === 'Director' || job === 'Series Director') {
+			addToTVCategory(tvDirectingMap, item, 'Director');
+		} else if (
+			dept === 'Writing' ||
+			['Writer', 'Screenplay', 'Creator', 'Story', 'Series Writer', 'Co-Writer'].includes(job)
+		) {
+			addToTVCategory(tvWritingMap, item, job);
+		} else if (
+			dept === 'Production' ||
+			[
+				'Executive Producer',
+				'Producer',
+				'Co-Executive Producer',
+				'Series Producer',
+				'Supervising Producer'
+			].includes(job)
+		) {
+			addToTVCategory(tvProducingMap, item, job);
+		} else if (
+			dept === 'Camera' ||
+			['Director of Photography', 'Cinematography', 'Cinematographer'].includes(job)
+		) {
+			addToTVCategory(tvCinematographyMap, item, job);
+		} else {
+			addToTVCategory(tvOtherCrewMap, item, job);
+		}
+	}
+
+	const tvActingCredits = Array.from(tvActingMap.values()).sort(sortCreditsDesc);
+	const tvDirectingCredits = Array.from(tvDirectingMap.values()).sort(sortCreditsDesc);
+	const tvWritingCredits = Array.from(tvWritingMap.values()).sort(sortCreditsDesc);
+	const tvProducingCredits = Array.from(tvProducingMap.values()).sort(sortCreditsDesc);
+	const tvCinematographyCredits = Array.from(tvCinematographyMap.values()).sort(sortCreditsDesc);
+	const tvOtherCredits = Array.from(tvOtherCrewMap.values()).sort(sortCreditsDesc);
+
+	const uniqueTVIds = new Set([
+		...Array.from(tvActingMap.keys()),
+		...Array.from(tvDirectingMap.keys()),
+		...Array.from(tvWritingMap.keys()),
+		...Array.from(tvProducingMap.keys()),
+		...Array.from(tvCinematographyMap.keys()),
+		...Array.from(tvOtherCrewMap.keys())
+	]);
+
+	const tvCreditsGroup: RoleCreditsGroup<PersonCreditTV> = {
+		acting: tvActingCredits,
+		directing: tvDirectingCredits,
+		writing: tvWritingCredits,
+		producing: tvProducingCredits,
+		cinematography: tvCinematographyCredits,
+		other: tvOtherCredits,
+		totalCount: uniqueTVIds.size
+	};
+
 	return {
 		id,
 		name,
@@ -1735,7 +2948,11 @@ export function mapTMDBPersonToProfile(
 		producingCredits,
 		cinematographyCredits,
 		otherCrewCredits,
-		totalCreditsCount: uniqueMovieIds.size
+		movieCredits: movieCreditsGroup,
+		tvCredits: tvCreditsGroup,
+		movieCreditsCount: uniqueMovieIds.size,
+		tvCreditsCount: uniqueTVIds.size,
+		totalCreditsCount: uniqueMovieIds.size + uniqueTVIds.size
 	};
 }
 

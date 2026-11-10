@@ -2,10 +2,18 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/state';
 	import MovieCard from '#lib/components/movie/MovieCard.svelte';
+	import TVCard from '#lib/components/tv/TVCard.svelte';
 	import MovieCardSkeleton from '#lib/components/movie/MovieCardSkeleton.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
-	import { watchlistState } from '#lib/watchlist.svelte';
-	import type { WatchlistSortOption } from '#lib/types/watchlist';
+	import {
+		watchlistState,
+		watchlistItemToMovie,
+		watchlistItemToTVShow
+	} from '#lib/watchlist.svelte';
+	import type {
+		WatchlistSortOption,
+		WatchlistContentTypeFilter
+	} from '#lib/types/watchlist';
 	import {
 		Bookmark,
 		Trash2,
@@ -13,11 +21,14 @@
 		SlidersHorizontal,
 		AlertTriangle,
 		Film,
+		Tv,
+		Layers,
 		Check,
 		X
 	} from 'lucide-svelte';
 
 	let sortBy = $state<WatchlistSortOption>('date_added_desc');
+	let contentTypeFilter = $state<WatchlistContentTypeFilter>('all');
 	let selectedGenre = $state<string>('all');
 	let isConfirmingClear = $state(false);
 
@@ -25,11 +36,19 @@
 	let storageAvailable = $derived(watchlistState.storageAvailable);
 	let allSaved = $derived(watchlistState.items);
 	let totalCount = $derived(watchlistState.count);
+	let movieCount = $derived(watchlistState.movieCount);
+	let tvCount = $derived(watchlistState.tvCount);
 
-	// Extract unique genres present across saved movies
+	// Items filtered by content type (before genre filtering)
+	let contentTypeItems = $derived.by(() => {
+		if (contentTypeFilter === 'all') return allSaved;
+		return allSaved.filter((item) => item.mediaType === contentTypeFilter);
+	});
+
+	// Extract unique genres present across items in the active content type
 	let availableGenres = $derived.by(() => {
 		const set = new SvelteSet<string>();
-		for (const item of allSaved) {
+		for (const item of contentTypeItems) {
 			if (item.genres) {
 				for (const g of item.genres) {
 					if (g) set.add(g);
@@ -39,9 +58,9 @@
 		return Array.from(set).sort();
 	});
 
-	// Client-side filtering & sorting of saved movies
-	let displayedMovies = $derived.by(() => {
-		let list = watchlistState.getSortedMovies(sortBy);
+	// Client-side filtering & sorting of saved items
+	let displayedItems = $derived.by(() => {
+		let list = watchlistState.getSortedItems(sortBy, contentTypeFilter);
 		if (selectedGenre !== 'all') {
 			list = list.filter((m) => m.genres && m.genres.includes(selectedGenre));
 		}
@@ -58,6 +77,11 @@
 		selectedGenre = target.value;
 	}
 
+	function handleContentTypeChange(filter: WatchlistContentTypeFilter) {
+		contentTypeFilter = filter;
+		selectedGenre = 'all'; // Reset genre when switching content type
+	}
+
 	function handleClearAll() {
 		watchlistState.clear();
 		isConfirmingClear = false;
@@ -65,7 +89,7 @@
 
 	let canonicalUrl = $derived(page.url.href);
 	const metaDescription =
-		'Manage and explore your personal saved movie list on Cineva with instant offline persistence.';
+		'Manage and explore your personal saved movies and TV series on Cineva with instant offline persistence.';
 </script>
 
 <svelte:head>
@@ -98,7 +122,7 @@
 				My Watchlist
 			</h1>
 			<p class="mt-2 max-w-xl text-sm text-cinema-text-muted">
-				Your curated personal collection of films to watch. Stored privately and locally in your
+				Your curated personal collection of movies and TV series to watch. Stored privately and locally in your
 				browser.
 			</p>
 		</div>
@@ -119,7 +143,7 @@
 					<div
 						class="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-1.5 text-xs text-red-300"
 					>
-						<span class="px-2 font-medium">Remove all {totalCount} films?</span>
+						<span class="px-2 font-medium">Remove all {totalCount} titles?</span>
 						<button
 							type="button"
 							onclick={handleClearAll}
@@ -173,90 +197,157 @@
 			<EmptyState
 				icon={Bookmark}
 				title="Your Watchlist is Empty"
-				description="You haven't saved any films yet. Explore our curated collections and click 'Add to Watchlist' on any title to queue it for later."
+				description="You haven't saved any movies or TV series yet. Explore our curated collections and click 'Add to Watchlist' on any title to queue it for later."
 				actionHref="/explore"
-				actionLabel="Discover Films"
+				actionLabel="Discover Content"
 			/>
 		{:else}
-			<!-- Controls Bar: Filter & Sort -->
-			<div
-				class="mb-6 flex flex-col gap-4 border-b border-cinema-border/50 pb-4 sm:flex-row sm:items-center sm:justify-between"
-			>
+			<!-- Controls Bar: Content-Type Filter & Sort -->
+			<div class="mb-6 flex flex-col gap-4 border-b border-cinema-border/50 pb-5">
+				<!-- Content Type Filter Tabs -->
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<div
+						class="inline-flex items-center gap-1.5 rounded-xl border border-cinema-border bg-cinema-surface p-1 shadow-xs"
+						role="tablist"
+						aria-label="Filter watchlist by content type"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={contentTypeFilter === 'all'}
+							onclick={() => handleContentTypeChange('all')}
+							class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all {contentTypeFilter ===
+							'all'
+								? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+								: 'text-cinema-text-muted hover:text-cinema-text'}"
+						>
+							<Layers class="h-3.5 w-3.5" />
+							<span>All ({totalCount})</span>
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={contentTypeFilter === 'movie'}
+							onclick={() => handleContentTypeChange('movie')}
+							class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all {contentTypeFilter ===
+							'movie'
+								? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+								: 'text-cinema-text-muted hover:text-cinema-text'}"
+						>
+							<Film class="h-3.5 w-3.5" />
+							<span>Movies ({movieCount})</span>
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={contentTypeFilter === 'tv'}
+							onclick={() => handleContentTypeChange('tv')}
+							class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all {contentTypeFilter ===
+							'tv'
+								? 'bg-cinema-accent text-cinema-accent-foreground shadow-xs'
+								: 'text-cinema-text-muted hover:text-cinema-text'}"
+						>
+							<Tv class="h-3.5 w-3.5" />
+							<span>TV Shows ({tvCount})</span>
+						</button>
+					</div>
+
+					<!-- Sort & Genre Selects -->
+					<div class="flex flex-wrap items-center gap-3">
+						<!-- Genre Filter if multiple genres exist -->
+						{#if availableGenres.length > 1}
+							<div class="relative flex items-center">
+								<SlidersHorizontal
+									class="pointer-events-none absolute left-3 h-3.5 w-3.5 text-cinema-text-muted"
+								/>
+								<select
+									value={selectedGenre}
+									onchange={handleGenreChange}
+									aria-label="Filter watchlist by genre"
+									class="appearance-none rounded-xl border border-cinema-border bg-cinema-surface py-1.5 pr-8 pl-8 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 focus:border-cinema-accent focus:ring-1 focus:ring-cinema-accent focus:outline-none"
+								>
+									<option value="all">All Genres ({contentTypeItems.length})</option>
+									{#each availableGenres as genre (genre)}
+										<option value={genre}>{genre}</option>
+									{/each}
+								</select>
+							</div>
+						{/if}
+
+						<!-- Sort Selector -->
+						<div class="relative flex items-center">
+							<ArrowUpDown
+								class="pointer-events-none absolute left-3 h-3.5 w-3.5 text-cinema-text-muted"
+							/>
+							<select
+								value={sortBy}
+								onchange={handleSortChange}
+								aria-label="Sort watchlist"
+								class="appearance-none rounded-xl border border-cinema-border bg-cinema-surface py-1.5 pr-8 pl-8 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 focus:border-cinema-accent focus:ring-1 focus:ring-cinema-accent focus:outline-none"
+							>
+								<option value="date_added_desc">Recently Added</option>
+								<option value="date_added_asc">Oldest Added</option>
+								<option value="rating_desc">Highest Rated</option>
+								<option value="year_desc">Release Year</option>
+								<option value="title_asc">Title (A-Z)</option>
+							</select>
+						</div>
+					</div>
+				</div>
+
 				<!-- Total Counter & Filter Info -->
 				<div class="flex items-center gap-2 text-xs text-cinema-text-muted">
-					<span class="font-semibold text-cinema-text">{displayedMovies.length}</span>
+					<span class="font-semibold text-cinema-text">{displayedItems.length}</span>
 					<span>
-						of {totalCount} film{totalCount === 1 ? '' : 's'} saved
+						of {contentTypeItems.length}
+						{contentTypeFilter === 'all'
+							? 'title'
+							: contentTypeFilter === 'movie'
+								? 'movie'
+								: 'TV show'}{contentTypeItems.length === 1 ? '' : 's'} displayed
 						{#if selectedGenre !== 'all'}
 							in <span class="font-medium text-cinema-accent">{selectedGenre}</span>
 						{/if}
 					</span>
 				</div>
-
-				<!-- Sort & Genre Selects -->
-				<div class="flex flex-wrap items-center gap-3">
-					<!-- Genre Filter if multiple genres exist -->
-					{#if availableGenres.length > 1}
-						<div class="relative flex items-center">
-							<SlidersHorizontal
-								class="pointer-events-none absolute left-3 h-3.5 w-3.5 text-cinema-text-muted"
-							/>
-							<select
-								value={selectedGenre}
-								onchange={handleGenreChange}
-								aria-label="Filter watchlist by genre"
-								class="appearance-none rounded-xl border border-cinema-border bg-cinema-surface py-1.5 pr-8 pl-8 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 focus:border-cinema-accent focus:ring-1 focus:ring-cinema-accent focus:outline-none"
-							>
-								<option value="all">All Genres ({totalCount})</option>
-								{#each availableGenres as genre (genre)}
-									<option value={genre}>{genre}</option>
-								{/each}
-							</select>
-						</div>
-					{/if}
-
-					<!-- Sort Selector -->
-					<div class="relative flex items-center">
-						<ArrowUpDown
-							class="pointer-events-none absolute left-3 h-3.5 w-3.5 text-cinema-text-muted"
-						/>
-						<select
-							value={sortBy}
-							onchange={handleSortChange}
-							aria-label="Sort watchlist"
-							class="appearance-none rounded-xl border border-cinema-border bg-cinema-surface py-1.5 pr-8 pl-8 text-xs font-medium text-cinema-text shadow-xs transition-colors hover:border-cinema-accent/40 focus:border-cinema-accent focus:ring-1 focus:ring-cinema-accent focus:outline-none"
-						>
-							<option value="date_added_desc">Recently Added</option>
-							<option value="date_added_asc">Oldest Added</option>
-							<option value="rating_desc">Highest Rated</option>
-							<option value="year_desc">Release Year</option>
-							<option value="title_asc">Title (A-Z)</option>
-						</select>
-					</div>
-				</div>
 			</div>
 
-			<!-- Movie Grid -->
-			{#if displayedMovies.length === 0}
+			<!-- Media Grid -->
+			{#if displayedItems.length === 0}
 				<div class="rounded-2xl border border-cinema-border bg-cinema-surface/40 p-12 text-center">
-					<Film class="mx-auto h-10 w-10 text-cinema-text-muted" />
+					{#if contentTypeFilter === 'tv'}
+						<Tv class="mx-auto h-10 w-10 text-cinema-text-muted" />
+					{:else}
+						<Film class="mx-auto h-10 w-10 text-cinema-text-muted" />
+					{/if}
 					<p class="mt-3 text-sm font-semibold text-cinema-text">
-						No films match genre "{selectedGenre}"
+						{#if selectedGenre !== 'all'}
+							No {contentTypeFilter === 'tv' ? 'TV shows' : contentTypeFilter === 'movie' ? 'movies' : 'titles'} match genre "{selectedGenre}"
+						{:else}
+							No {contentTypeFilter === 'tv' ? 'TV shows' : 'movies'} in your watchlist
+						{/if}
 					</p>
 					<button
 						type="button"
-						onclick={() => (selectedGenre = 'all')}
+						onclick={() => {
+							selectedGenre = 'all';
+							contentTypeFilter = 'all';
+						}}
 						class="mt-3 text-xs font-semibold text-cinema-accent hover:underline focus-visible:outline-none"
 					>
-						Show all saved films
+						Show all saved titles
 					</button>
 				</div>
 			{:else}
 				<div
 					class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5"
 				>
-					{#each displayedMovies as movie (movie.id)}
-						<MovieCard {movie} />
+					{#each displayedItems as item (`${item.mediaType}:${item.id}`)}
+						{#if item.mediaType === 'tv'}
+							<TVCard show={watchlistItemToTVShow(item)} />
+						{:else}
+							<MovieCard movie={watchlistItemToMovie(item)} />
+						{/if}
 					{/each}
 				</div>
 			{/if}

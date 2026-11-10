@@ -1,7 +1,10 @@
+export type WatchlistMediaType = 'movie' | 'tv';
+
 export interface WatchlistItem {
 	id: string;
 	title: string;
 	posterUrl: string;
+	mediaType: WatchlistMediaType;
 	backdropUrl?: string;
 	releaseYear?: number | null;
 	rating?: number | null;
@@ -17,7 +20,13 @@ export interface WatchlistStorageData {
 }
 
 export type WatchlistSortOption =
-	'date_added_desc' | 'date_added_asc' | 'rating_desc' | 'year_desc' | 'title_asc';
+	| 'date_added_desc'
+	| 'date_added_asc'
+	| 'rating_desc'
+	| 'year_desc'
+	| 'title_asc';
+
+export type WatchlistContentTypeFilter = 'all' | 'movie' | 'tv';
 
 export interface ToastMessage {
 	id: string;

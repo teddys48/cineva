@@ -1,5 +1,8 @@
 import type { Movie } from './movie';
+import type { TVShow } from './tv';
 import type { TMDBGenre, TMDBSortOption } from './tmdb';
+
+export type SearchContentType = 'all' | 'movie' | 'tv' | 'person';
 
 export interface SearchPerson {
 	id: string;
@@ -74,14 +77,25 @@ export interface SuggestionMovieItem {
 	posterUrl: string;
 }
 
+export interface SuggestionTVItem {
+	id: string;
+	name: string;
+	firstAirYear: number | null;
+	rating: number | null;
+	posterUrl: string;
+}
+
 export interface SearchSuggestionsResponse {
 	movies: SuggestionMovieItem[];
+	tvShows?: SuggestionTVItem[];
 	people: SearchPerson[];
 	discovery: DiscoveryFilterSuggestion[];
 }
 
 export interface UnifiedSearchOptions {
 	query?: string;
+	contentType?: SearchContentType;
+	type?: SearchContentType;
 	genre?: string | number;
 	year?: number;
 	minRating?: number;
@@ -95,8 +109,10 @@ export interface UnifiedSearchOptions {
 
 export interface UnifiedSearchResult {
 	query: string;
+	contentType?: SearchContentType;
 	interpretation: QueryInterpretation;
 	movies: Movie[];
+	tvShows: TVShow[];
 	people: SearchPerson[];
 	companies: SearchCompany[];
 	activeFilters: ActiveFilterItem[];
@@ -105,4 +121,5 @@ export interface UnifiedSearchResult {
 	page: number;
 	error: string | null;
 	genres: TMDBGenre[];
+	tvGenres?: TMDBGenre[];
 }

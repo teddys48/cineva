@@ -5,12 +5,15 @@
 	import { page } from '$app/state';
 	import type { PageData } from './$types';
 	import type { Movie } from '#lib/types/movie';
+	import type { TVShow } from '#lib/types/tv';
 	import type {
 		SearchPerson,
 		SearchCompany,
 		ActiveFilterItem,
-		SearchSuggestionsResponse
+		SearchSuggestionsResponse,
+		SearchContentType
 	} from '#lib/types/search';
+	import TVCard from '#lib/components/tv/TVCard.svelte';
 	import MovieGrid from '#lib/components/movie/MovieGrid.svelte';
 	import MovieCardSkeleton from '#lib/components/movie/MovieCardSkeleton.svelte';
 	import EmptyState from '#lib/components/ui/EmptyState.svelte';
@@ -36,6 +39,7 @@
 		Users,
 		Building2,
 		Film,
+		Tv,
 		Sparkles
 	} from 'lucide-svelte';
 
@@ -46,6 +50,8 @@
 	let committedQuery = $state('');
 	let currentPage = $state(1);
 	let movies = $state<Movie[]>([]);
+	let tvShows = $state<TVShow[]>([]);
+	let contentType = $state<SearchContentType>('all');
 	let people = $state<SearchPerson[]>([]);
 	let companies = $state<SearchCompany[]>([]);
 	let activeFilters = $state<ActiveFilterItem[]>([]);
@@ -100,6 +106,8 @@
 		committedQuery = data.query || '';
 		currentPage = data.page || 1;
 		movies = data.movies || [];
+		tvShows = data.tvShows || [];
+		contentType = (data.contentType as SearchContentType) || 'all';
 		people = data.people || [];
 		companies = data.companies || [];
 		activeFilters = data.activeFilters || [];
@@ -130,10 +138,18 @@
 		if (suggestAbortController) suggestAbortController.abort();
 	});
 
-	function buildSearchUrl(term: string, pageNum = 1, filtersObj = currentFilters): string {
+	function handleTabChange(newType: SearchContentType) {
+		contentType = newType;
+		const targetUrl = buildSearchUrl(committedQuery || queryInput, 1, currentFilters, newType);
+		goto(targetUrl, { reset: false });
+	}
+
+	function buildSearchUrl(term: string, pageNum = 1, filtersObj = currentFilters, typeOverride?: SearchContentType): string {
 		const params = new SvelteURLSearchParams();
 		const trimmed = term.trim();
+		const activeType = typeOverride ?? contentType;
 		if (trimmed) params.set('query', trimmed);
+		if (activeType && activeType !== 'all') params.set('type', activeType);
 		if (filtersObj.genre) params.set('genre', String(filtersObj.genre));
 		if (filtersObj.year) params.set('year', String(filtersObj.year));
 		if (filtersObj.minRating) params.set('minRating', String(filtersObj.minRating));
@@ -202,6 +218,7 @@
 		try {
 			const apiParams = new SvelteURLSearchParams();
 			if (trimmed) apiParams.set('query', trimmed);
+			if (contentType && contentType !== 'all') apiParams.set('type', contentType);
 			if (filtersOverride.genre) apiParams.set('genre', String(filtersOverride.genre));
 			if (filtersOverride.year) apiParams.set('year', String(filtersOverride.year));
 			if (filtersOverride.minRating) apiParams.set('minRating', String(filtersOverride.minRating));
@@ -220,7 +237,8 @@
 			}
 
 			const result = await res.json();
-			movies = result.movies || result.results || [];
+			movies = result.movies || [];
+			tvShows = result.tvShows || [];
 			people = result.people || [];
 			companies = result.companies || [];
 			activeFilters = result.activeFilters || [];
@@ -238,6 +256,7 @@
 			console.error('Client search error:', err);
 			searchError = 'Unable to complete search request. Please try again.';
 			movies = [];
+			tvShows = [];
 			people = [];
 			companies = [];
 			totalPages = 0;
@@ -271,7 +290,7 @@
 			const data = (await res.json()) as SearchSuggestionsResponse;
 			suggestionsData = data;
 			const totalCount =
-				(data.discovery?.length ?? 0) + (data.people?.length ?? 0) + (data.movies?.length ?? 0);
+				(data.discovery?.length ?? 0) + (data.people?.length ?? 0) + (data.tvShows?.length ?? 0) + (data.movies?.length ?? 0);
 			isSuggestionsOpen = totalCount > 0;
 			suggestionActiveIndex = -1;
 		} catch (err: unknown) {
@@ -351,6 +370,13 @@
 			}
 			idx++;
 		}
+		for (const t of suggestionsData.tvShows || []) {
+			if (idx === suggestionActiveIndex) {
+				handleSuggestionItemSelect({ kind: 'tv', item: t });
+				return;
+			}
+			idx++;
+		}
 		for (const m of suggestionsData.movies || []) {
 			if (idx === suggestionActiveIndex) {
 				handleSuggestionItemSelect({ kind: 'movie', item: m });
@@ -366,6 +392,8 @@
 
 		if (suggestion.kind === 'movie') {
 			goto(`/movie/${suggestion.item.id}`);
+		} else if (suggestion.kind === 'tv') {
+			goto(`/tv/${suggestion.item.id}`);
 		} else if (suggestion.kind === 'person') {
 			goto(`/person/${suggestion.item.id}`);
 		} else if (suggestion.kind === 'discovery') {
@@ -702,7 +730,7 @@
 					<MovieCardSkeleton />
 				{/each}
 			</div>
-		{:else if (committedQuery || activeFilters.length > 0) && movies.length === 0 && people.length === 0 && companies.length === 0 && !isLoading}
+		{:else if (committedQuery || activeFilters.length > 0) && movies.length === 0 && tvShows.length === 0 && people.length === 0 && companies.length === 0 && !isLoading}
 			<!-- Empty State -->
 			<EmptyState
 				icon={Clapperboard}
@@ -714,6 +742,72 @@
 				actionLabel="Explore All Movies"
 			/>
 		{:else if movies.length > 0 || people.length > 0 || companies.length > 0}
+			<!-- Content-Type Tabs -->
+			<div class="mb-6 flex flex-wrap items-center gap-2 border-b border-cinema-border/50 pb-4">
+				<button
+					type="button"
+					onclick={() => handleTabChange('all')}
+					class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all {contentType === 'all'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-sm'
+						: 'bg-cinema-surface text-cinema-text-muted hover:bg-cinema-elevated hover:text-cinema-text'}"
+				>
+					<span>All</span>
+					{#if movies.length + tvShows.length + people.length > 0}
+						<span class="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] dark:bg-white/20">
+							{movies.length + tvShows.length + people.length}
+						</span>
+					{/if}
+				</button>
+
+				<button
+					type="button"
+					onclick={() => handleTabChange('movie')}
+					class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all {contentType === 'movie'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-sm'
+						: 'bg-cinema-surface text-cinema-text-muted hover:bg-cinema-elevated hover:text-cinema-text'}"
+				>
+					<Film class="h-3.5 w-3.5" />
+					<span>Movies</span>
+					{#if movies.length > 0 && (contentType === 'all' || contentType === 'movie')}
+						<span class="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] dark:bg-white/20">
+							{movies.length}
+						</span>
+					{/if}
+				</button>
+
+				<button
+					type="button"
+					onclick={() => handleTabChange('tv')}
+					class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all {contentType === 'tv'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-sm'
+						: 'bg-cinema-surface text-cinema-text-muted hover:bg-cinema-elevated hover:text-cinema-text'}"
+				>
+					<Tv class="h-3.5 w-3.5" />
+					<span>TV Shows</span>
+					{#if tvShows.length > 0}
+						<span class="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] dark:bg-white/20">
+							{tvShows.length}
+						</span>
+					{/if}
+				</button>
+
+				<button
+					type="button"
+					onclick={() => handleTabChange('person')}
+					class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all {contentType === 'person'
+						? 'bg-cinema-accent text-cinema-accent-foreground shadow-sm'
+						: 'bg-cinema-surface text-cinema-text-muted hover:bg-cinema-elevated hover:text-cinema-text'}"
+				>
+					<Users class="h-3.5 w-3.5" />
+					<span>People</span>
+					{#if people.length > 0 && (contentType === 'all' || contentType === 'person')}
+						<span class="rounded-full bg-black/15 px-1.5 py-0.5 text-[10px] dark:bg-white/20">
+							{people.length}
+						</span>
+					{/if}
+				</button>
+			</div>
+
 			<!-- Results Header -->
 			<div
 				class="mb-8 flex flex-col gap-2 border-b border-cinema-border/50 pb-4 sm:flex-row sm:items-center sm:justify-between"
@@ -747,7 +841,7 @@
 			</div>
 
 			<!-- 1. People Section (Distinct from Movie Grids) -->
-			{#if people.length > 0}
+			{#if people.length > 0 && (contentType === 'all' || contentType === 'person')}
 				<section class="mb-12" aria-label="People Results">
 					<div class="mb-4 flex items-center gap-2">
 						<div
@@ -788,8 +882,29 @@
 				</section>
 			{/if}
 
+			<!-- 2.5 TV Shows Section -->
+			{#if tvShows.length > 0 && (contentType === 'all' || contentType === 'tv')}
+				<section class="mb-12" aria-label="TV Show Results">
+					<div class="mb-4 flex items-center gap-2">
+						<div
+							class="flex h-7 w-7 items-center justify-center rounded-lg border border-cinema-border bg-cinema-surface text-cinema-accent"
+						>
+							<Tv class="h-4 w-4" />
+						</div>
+						<h2 class="font-['Space_Grotesk'] text-lg font-bold text-cinema-text sm:text-xl">
+							TV Shows ({tvShows.length})
+						</h2>
+					</div>
+					<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-5">
+						{#each tvShows as show (show.id)}
+							<TVCard {show} />
+						{/each}
+					</div>
+				</section>
+			{/if}
+
 			<!-- 3. Movies Section -->
-			{#if movies.length > 0}
+			{#if movies.length > 0 && (contentType === 'all' || contentType === 'movie')}
 				<section aria-label="Movie Results">
 					{#if people.length > 0 || companies.length > 0}
 						<div class="mb-4 flex items-center gap-2">
